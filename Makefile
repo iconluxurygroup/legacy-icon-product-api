@@ -19,4 +19,8 @@ run:
 	#docker run -p 8080:8080 28dfb1edb760
 deploy:
 	#deploy commands
-all: install lint test build run deploy
+	aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 590183839343.dkr.ecr.us-east-1.amazonaws.com
+	docker build -t icon-product-api .
+	docker tag icon-product-api:latest 590183839343.dkr.ecr.us-east-1.amazonaws.com/icon-product-api:latest
+	docker push 590183839343.dkr.ecr.us-east-1.amazonaws.com/icon-product-api:latest
+all: install lint test deploy
