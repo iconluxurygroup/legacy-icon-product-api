@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import fire
-from mylib.logic import hello_world
+from mylib import logic
 
 if __name__ == "__main__":
-    fire.Fire(hello_world)
+    fire.Fire(logic)
