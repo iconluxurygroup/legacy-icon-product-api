@@ -6,3 +6,4 @@
 2. Setup structure files 'Makefile, 'requirements.txt' , 'main.py, 'Dockerfile, 'mylib/__init__.py', 
 3. Populate 'Makefile'
 4. Setup continuous integration
+5. Build cli using Python Fire Library './cli-fire.py' to test logic
