@@ -23,5 +23,6 @@ jobs:
     - name: Format Code
       run: |
         #make format
+        make format
               
               
