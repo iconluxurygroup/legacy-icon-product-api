@@ -13,6 +13,10 @@ test:
 	python -m pytest -vv --cov=mylib --cov=main test_*.py
 build:
 	#build container
+	docker build -t deploy-fastapi .
+run:
+	#run container
+	#docker run -p 8080:8080 28dfb1edb760
 deploy:
 	#deploy commands
-all: install lint test deploy
+all: install lint test build run deploy
