@@ -1,10 +1,10 @@
-from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi import FastAPI, APIRouter#, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from mylib.logic import (hello_world,hello_nik)
-from models.endpoint_io_models import RequestData,Task
+from models.endpoint_io_models import RequestData#,Task
 from tasks.celery_back_tasks import create_task
-from celery_worker import celery_app
+#from celery_worker import celery_app
 
 app = FastAPI(title="Icon Product Api")
 
