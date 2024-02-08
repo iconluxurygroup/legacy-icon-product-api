@@ -5,7 +5,7 @@ from mylib.logic import (hello_world,hello_nik)
 app = FastAPI()
 @app.get("/")
 def root():
-    return {"message": "Hello World API use /hello_world or /hello_nik/{name} for a personalized message"}
+    return {"message": "Hello World API use /hello_world or /hello_nik/yourname for a personalized message"}
         
 @app.get("/hello_nik/{name}")
 async def hello_nik_api(name: str):
