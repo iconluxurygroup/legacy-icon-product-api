@@ -7,7 +7,7 @@ client = TestClient(app)
 def test_read_root_api():
     response = client.get("/")
     assert response.status_code == 200
-    assert response.json() == {"message": "Hello World API use /hello_world or /hello_nik/yourname for a personalized message"}
+    assert response.json() == {"message": "Hello World API use /hello_world or /hello_nik/yourname for a personalized message :)"}
 
 def test_hello_nik_api():
     response = client.get("/hello_nik/Joe")
