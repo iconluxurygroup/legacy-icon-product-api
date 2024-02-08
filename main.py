@@ -1,25 +1,52 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, APIRouter, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from mylib.logic import (hello_world,hello_nik)
+from models.endpoint_io_models import RequestData,Task
+from tasks.celery_back_tasks import create_task
+from celery_worker import celery_app
 
 app = FastAPI(title="Icon Product Api")
 
+# CORS Middleware setup
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+    allow_credentials=True,
+)
+# Define a router for user-related operations
+sample_router = APIRouter()
+product_router = APIRouter()
+# Define a router for product-related operations
 
-@app.get("/")
+
+@sample_router.get("/")
 def root():
     return {"message": "Hello World API use /hello_world or /hello_nik/yourname for a personalized message :)"}
         
-@app.get("/hello_nik/{name}")
+@sample_router.get("/hello_nik/{name}")
 async def hello_nik_api(name: str):
     return {"message": hello_nik(name)}
 
-@app.get("/hello_world")
+@sample_router.get("/hello_world")
 async def hello_world_api():
     return {"message": hello_world()}
 
+@product_router.post('/create')
+async def send_product(requestData:RequestData):
+    task_id = create_task.delay(requestData.dataset_split)
+    return {'task_id': str(task_id), 'status': 'Processing'}
 
+
+app.include_router(sample_router, prefix="/api/v1/sample")
+app.include_router(product_router, prefix="/api/v1")
 
 
 
 if __name__ == "__main__":
+    #LOCAL WITH RELOAD
+    #uvicorn.run("main:app", port=8080 ,host='0.0.0.0',reload=True)
+    #production
     uvicorn.run(app, port=8080 ,host='0.0.0.0')
