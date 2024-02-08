@@ -2,7 +2,9 @@ from fastapi import FastAPI
 import uvicorn
 from mylib.logic import (hello_world,hello_nik)
 
-app = FastAPI()
+app = FastAPI(title="Icon Product Api")
+
+
 @app.get("/")
 def root():
     return {"message": "Hello World API use /hello_world or /hello_nik/yourname for a personalized message :)"}
