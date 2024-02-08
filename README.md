@@ -9,3 +9,8 @@
 3. Populate 'Makefile'
 4. Setup continuous integration
 5. Build cli using Python Fire Library './cli-fire.py' to test logic
+6. Write tests and update make file and CI
+7. Setup 'Dockerfile' and 'docker-compose.yml'
+8. build, test, deploy
+
+
