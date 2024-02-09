@@ -7,31 +7,36 @@ from tasks.classes_and_utility import BrandSettings,SKUManager,SearchEngine,Filt
 from settings import BRANDSETTINGSPATH
 
 
-def fetch_task_result(task_id):
+def fetch_task_result(task_id: str) -> dict:
+    """
+    Fetches the result of a Celery task by its ID. If the task is part of a workflow with subtasks,
+    it recursively fetches the results of all subtasks.
+
+    :param task_id: The ID of the Celery task.
+    :return: A dictionary with the task status and result.
+    """
     task_result = AsyncResult(task_id, app=celery_app)
     if not task_result.ready():
-        return None  # or consider raising an exception or returning a status indicating it's still processing
+        # The task is still processing
+        return {'status': 'Processing', 'result': None}
     
-    result = task_result.get()  # This might be a single result or a list containing more task IDs
+    result = task_result.get()
     if isinstance(result, list):
-        # Assuming result format is similar to the one provided: [[task_id, [subtask_results]], status]
-        # Adjust the parsing logic based on your actual result structure
+        # The result is a list, potentially indicating a workflow with subtasks
         final_results = []
         for item in result:
-            if isinstance(item, list) and item:  # Check if the first item is a list with content
+            if isinstance(item, list) and item:
                 subtask_id = item[0]
                 if subtask_id is not None:
-                    # Recursively fetch results of subtasks
                     subtask_result = fetch_task_result(subtask_id)
                     final_results.append(subtask_result)
                 else:
-                    # Handle case where there's no more subtask IDs, and we have final data
                     final_results.append(item)
-        return final_results
+        return {'status': 'Completed', 'result': final_results}
     else:
-        # Directly return the result if it's not a list implying no further nested tasks
-        return result
-    
+        # The task is completed and there are no further nested tasks
+        return {'status': 'Completed', 'result': result}
+
 def filter_price(result):
     if result and isinstance(result, dict) and 'details' in result and result['details']:
         if 'prices' in result['details'] and result['details']['prices']:

@@ -1,22 +1,15 @@
 from celery import chain, chord
 from celery_worker import celery_app
-from tasks.celery_helper import initial_task,process_item, filter_results, classify_urls,combine_results,execute_and_return_chord_result,fetch_task_result
+from tasks.celery_helper import initial_task,process_item, filter_results, classify_urls,combine_results,execute_and_return_chord_result
 
-#!!!!!
 @celery_app.task(name='create_task')
 def create_task(data):
     brand = data[0]
     sku = data[1]
     task_id = execute_workflow(brand,sku)
-    result = fetch_task_result(task_id)
-    
-    if 'price' not in result:
-        task_id = result.get('task_id')
-        
-        result = fetch_task_result(task_id)
-    
-    return result
-#!!!!!
+    return task_id
+
+
 def execute_workflow(brand, sku):
     sku_variations = initial_task(brand, sku)
     if sku_variations:

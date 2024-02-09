@@ -1,10 +1,12 @@
-from fastapi import FastAPI, APIRouter#, HTTPException
+from fastapi import FastAPI, APIRouter, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
+from celery.result import AsyncResult
 from mylib.logic import (hello_world,hello_nik)
+from tasks.celery_helper import fetch_task_result
 from models.endpoint_io_models import RequestData#,Task
 from tasks.celery_back_tasks import create_task
-#from celery_worker import celery_app
+
 
 app = FastAPI(title="Icon Product Api")
 
@@ -39,7 +41,17 @@ async def send_product(requestData:RequestData):
     task_id = create_task.delay(requestData.dataset_split)
     return {'task_id': str(task_id), 'status': 'Processing'}
 
-
+@product_router.get("/poll/{task_id}")
+async def poll_task(task_id: str):
+    result = fetch_task_result(task_id)
+    if result['status'] == 'Processing':
+        return {'status': 'Processing'}
+    elif result['status'] == 'Completed':
+        return {'status': 'Completed', 'result': result['result']}
+    else:
+        raise HTTPException(status_code=500, detail="Unexpected task status")
+    
+    
 app.include_router(sample_router, prefix="/api/v1/sample")
 app.include_router(product_router, prefix="/api/v1")
 
