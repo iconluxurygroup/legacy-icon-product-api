@@ -9,3 +9,4 @@ fastapi==0.109.2
 uvicorn==0.27.0.post1
 httpx==0.26.0
 celery[redis]
+beautifulsoup4==4.12.3
