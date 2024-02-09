@@ -1,5 +1,38 @@
+#name: Python application test with Github Actions
+#on: [push]
+#jobs:
+#  build:
+#    runs-on: ubuntu-latest
+#    steps:
+#    - uses: actions/checkout@v4
+#    - name: Set up Python 3.10
+#      uses: actions/setup-python@v5
+#      with:
+#        python-version: '3.10' 
+#    - name: Install dependencies 
+#      run: |
+#        make install
+#    - name: Lint with pylint 
+#      run: |
+#        #make lint
+#        make lint
+#    - name: Test with pytest 
+#      run: |
+#        #make test
+#        make test
+#    - name: Format Code
+#      run: |
+#        #make format
+#        make format
+#    - name: Build Container
+#      run: |
+#        # Build Container
+#        make build
+       
 name: Python application test with Github Actions
+
 on: [push]
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -10,23 +43,17 @@ jobs:
       with:
         python-version: '3.10' 
     - name: Install dependencies 
-      run: |
-        make install
+      run: make install
     - name: Lint with pylint 
-      run: |
-        #make lint
-        make lint
+      run: make lint
     - name: Test with pytest 
-      run: |
-        #make test
-        make test
+      run: make test
     - name: Format Code
+      run: make format
+    - name: Build and run Docker containers
       run: |
-        #make format
-        make format
-    - name: Build Container
-      run: |
-        # Build Container
         make build
-              
-              
+        make up
+    - name: Shutdown Docker containers
+      if: always()
+      run: make down
