@@ -68,7 +68,9 @@ def initial_task(brand, sku):
 @shared_task
 def process_group_results(results):
     # Process results from group, potentially just aggregating them
-    aggregated_results = [result for result in results] # Simplified example
+    #!aggregated_results = [result for result in results] # Simplified example
+    aggregated_results = [result for result in (results or [])]
+
     #return choose_best_result(aggregated_results)
     return {"task_name": "process_group_results", "result": choose_best_result(aggregated_results) }
 @shared_task(bind=True)
@@ -89,12 +91,13 @@ def process_item(item):#get html and return list of parsed google urls
 
 @shared_task
 def filter_results(url_list_with_items, brand):
-    print(url_list_with_items)
+    if url_list_with_items is None:
+        url_list_with_items = []
     filtered_url_list_with_info = []
 
     # Create a mapping from URL to its corresponding dictionary
     url_to_original_dict = {url_dict['url']: url_dict for url_dict in url_list_with_items}
-
+    
     # Extract URLs and apply filtering
     urls = [url_dict['url'] for url_dict in url_list_with_items]
     
@@ -152,6 +155,7 @@ def classify_urls(url_list):
 
 @shared_task(bind=True)
 def execute_and_return_chord_result(self, data, brand):
+    data = data or []
     # Setup the tasks to be executed in parallel within the group
     tasks_group = [fetch_and_parse_html.s(url_info, brand) for url_info in data]
     # Specify the callback task to process results after the group has finished

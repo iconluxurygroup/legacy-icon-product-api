@@ -8,14 +8,20 @@ services:
       - redis
 #  redis:
 #    image: "redis:alpine"
+  # redis:
+  #   image: "redis:alpine"
+  #   ports:
+  #     - "6379:6379"
   redis:
     image: "redis:alpine"
     ports:
       - "6379:6379"
+    command: redis-server --client-output-buffer-limit pubsub 512mb 128mb 60
   celery:
     build: .
     #command: celery -A celery_worker --loglevel=info
-    command: celery -A celery_worker.celery_app worker --loglevel=info
+    #command: celery -A celery_worker.celery_app worker --loglevel=info
+    command: celery -A celery_worker.celery_app worker --loglevel=info --pool=gevent --autoscale=10000,3
     depends_on:
       - redis
   flower:
