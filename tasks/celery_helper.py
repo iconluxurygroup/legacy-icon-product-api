@@ -21,8 +21,11 @@ def fetch_task_result(task_id: str) -> dict:
     if not task_result.ready():
         # The task is still processing
         return {'status': 'Processing', 'result': None}
-    
-    result = task_result.get()
+    #@!!!!!!
+    if task_result:
+        result = task_result.get()
+    else:
+        return {'status': 'Invalid', 'result': None}   
     if isinstance(result, list):
         # The result is a list, potentially indicating a workflow with subtasks
         final_results = []
