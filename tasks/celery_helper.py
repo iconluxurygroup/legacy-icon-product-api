@@ -15,6 +15,8 @@ def fetch_task_result(task_id: str) -> dict:
     :param task_id: The ID of the Celery task.
     :return: A dictionary with the task status and result.
     """
+    if task_id is None:
+        return {'status': 'Invalid', 'result': None}
     task_result = AsyncResult(task_id, app=celery_app)
     if not task_result.ready():
         # The task is still processing
