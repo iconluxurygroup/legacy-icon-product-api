@@ -13,6 +13,7 @@
 7. Setup 'Dockerfile' and 'docker-compose.yml'
 8. build, test, deploy
 7. Read API key from variable, later dotenv variable
+8. Skip products that have images (option)
 # sam
 
 
