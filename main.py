@@ -8,6 +8,10 @@ from models.endpoint_io_models import RequestData#,Task
 from tasks.celery_back_tasks import create_task
 
 
+from tasks.celery_helper_image import fetch_task_result_image
+from tasks.celery_back_tasks_image import create_task_image
+
+
 app = FastAPI(title="Icon Product Api")
 
 # CORS Middleware setup
@@ -20,7 +24,8 @@ app.add_middleware(
 )
 # Define a router for user-related operations
 sample_router = APIRouter()
-product_router = APIRouter()
+msrp_router = APIRouter()
+image_router = APIRouter()
 # Define a router for product-related operations
 
 
@@ -36,24 +41,43 @@ async def hello_nik_api(name: str):
 async def hello_world_api():
     return {"message": hello_world()}
 
-@product_router.post('/create')
+@msrp_router.post('/create')
 async def send_product(requestData:RequestData):
     task_id = create_task.delay(requestData.dataset_split)
     return {'task_id': str(task_id), 'status': 'Processing'}
 
-@product_router.get("/poll/{task_id}")
+@msrp_router.get("/poll/{task_id}")
 async def poll_task(task_id: str):
     result = fetch_task_result(task_id)
     if result['status'] == 'Processing':
         return {'status': 'Processing'}
     elif result['status'] == 'Completed':
-        return {'status': 'Completed', 'result': result['result']}
+        if 'task_name' in result['result']:
+            return result['result']
+        else:
+            return {'status': 'Completed', 'result': result['result']}
     else:
         raise HTTPException(status_code=500, detail="Unexpected task status")
+#!!!!!!!!!!!!!!!!!!!!!!!!    
+@image_router.post('/create')
+async def send_product(requestData:RequestData):
+    task_id = create_task_image.delay(requestData.dataset_split)
+    return {'task_id': str(task_id), 'status': 'Processing'}
+
+@image_router.get("/poll/{task_id}")
+async def poll_task(task_id: str):
+    result = fetch_task_result_image(task_id)
+    if result['status'] == 'Processing':
+        return {'status': 'Processing'}
+    elif result['status'] == 'Completed':
+        return {'status': 'Completed', 'result': result['result']}
+    else:
+        raise HTTPException(status_code=500, detail="Unexpected task status")    
     
     
 app.include_router(sample_router, prefix="/api/v1/sample")
-app.include_router(product_router, prefix="/api/v1")
+app.include_router(msrp_router, prefix="/api/v1/msrp")
+app.include_router(image_router, prefix="/api/v1/image")
 
 
 

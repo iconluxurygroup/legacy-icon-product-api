@@ -7,7 +7,12 @@ def create_task(data):
     brand = data[0]
     sku = data[1]
     task_id = execute_workflow(brand,sku)
-    return task_id
+    print(task_id)
+    if task_id: 
+        return task_id
+    else:
+        task_id = 'Brand Missing'
+        return task_id
 
 
 def execute_workflow(brand, sku):
@@ -19,7 +24,7 @@ def execute_workflow(brand, sku):
                 combine_results.s()  # Callback receives results with items
             ),
             filter_results.s(brand),
-            classify_urls.s(),
+            classify_urls.s(), 
             execute_and_return_chord_result.s(brand)
         )
         

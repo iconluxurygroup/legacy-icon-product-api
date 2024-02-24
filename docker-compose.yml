@@ -5,29 +5,36 @@ services:
     ports:
       - "8080:8080"
     depends_on:
+      - rabbitmq
       - redis
-#  redis:
-#    image: "redis:alpine"
-  # redis:
-  #   image: "redis:alpine"
-  #   ports:
-  #     - "6379:6379"
+
   redis:
     image: "redis:alpine"
     ports:
       - "6379:6379"
     command: redis-server --client-output-buffer-limit pubsub 512mb 128mb 60
+
+  rabbitmq:
+    image: "rabbitmq:3-management"
+    ports:
+      - "5672:5672"  # RabbitMQ broker
+      - "15672:15672"  # RabbitMQ management interface
+
   celery:
     build: .
-    #command: celery -A celery_worker --loglevel=info
-    #command: celery -A celery_worker.celery_app worker --loglevel=info
-    command: celery -A celery_worker.celery_app worker --loglevel=info --pool=gevent --autoscale=10000,3
+    command: celery -A celery_worker.celery_app worker --loglevel=DEBUG --pool=gevent --autoscale=1000,100
+    environment:
+      - CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
     depends_on:
+      - rabbitmq
       - redis
+
+
   flower:
     image: mher/flower
-    command: celery --broker=redis://redis:6379/0 flower --port=5555
+    command: celery --broker=amqp://guest:guest@rabbitmq:5672// flower --port=5555
     ports:
       - "5555:5555"
     depends_on:
-      - redis
+      - rabbitmq

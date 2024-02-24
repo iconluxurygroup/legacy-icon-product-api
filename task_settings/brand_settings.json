@@ -20,6 +20,7 @@
         "render": false,
         "delay": "False",
         "domain_hierarchy": ["alexandermcqueen.com"],
+        "image_domain":["amq-mcq.dam.kering.com"],
         "comments": "Standard format with optional color extension",
         "example_sku": ["553770WHGP01000"]
       },
@@ -405,6 +406,25 @@
         "domain_hierarchy": ["marcjacobs.com"],
         "comments": "",
         "example_sku": ["2P3HDF003H01"]
+      },
+      
+      {
+        "names": ["Vans"],
+        "full_name": "Vans",
+        "version": "1.0",
+        "last_updated": "2024-2-15",
+        "is_active": true,
+        "sku_format": {
+          "base": { "article": ["9"], "model": ["3"] },
+          "base_separator": "",
+          "color_extension": ["0"],
+          "color_separator": ""
+        },
+        "render": false,
+        "delay": false,
+        "domain_hierarchy": ["vans.com"],
+        "comments": "",
+        "example_sku": ["pvn0007nsjvy"]
       }
     ]
   }

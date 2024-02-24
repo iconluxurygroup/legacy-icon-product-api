@@ -3,16 +3,30 @@ from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 from settings import BRANDSETTINGSPATH
 
+# class BrandSettings:
+#     def __init__(self, settings):
+#         self.settings = settings
+
+#     def get_rules_for_brand(self, brand_name):
+#         for rule in self.settings['brand_rules']:
+#             if brand_name in rule['names']:
+#                 return rule
+#         return None
 class BrandSettings:
     def __init__(self, settings):
         self.settings = settings
 
     def get_rules_for_brand(self, brand_name):
+        # Convert brand_name to lowercase for case-insensitive comparison
+        brand_name_lower = brand_name.lower()
         for rule in self.settings['brand_rules']:
-            if brand_name in rule['names']:
+            # Convert each name in rule['names'] to lowercase and check if brand_name_lower is among them
+            if brand_name_lower in [name.lower() for name in rule['names']]:
                 return rule
         return None
-    
+    def get_brand_img_domains(self, brand_name):
+        # Convert brand_name to lowercase for case-insensitive comparison
+        return self.get_rules_for_brand(brand_name).get('image_domain', [])
     #FETCH SETTINGS REMOTELY FROM S3 or wtv.
     # def fetch_remote_config(url):
         # response = requests.get(url)

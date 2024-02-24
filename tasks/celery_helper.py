@@ -38,9 +38,14 @@ def fetch_task_result(task_id: str) -> dict:
                 else:
                     final_results.append(item)
         return {'status': 'Completed', 'result': final_results}
+    ##!!! CATCH RESULT BY DICT
+    elif isinstance(result, dict):
+        return {'status': 'Completed', 'result': result}
     else:
         # The task is completed and there are no further nested tasks
-        return {'status': 'Completed', 'result': result}
+        ####TRY FAILS RESULT = NONE
+       # return {'status': 'Completed', 'result': result}
+        return {'status': 'Invalid', 'result': result}
 
 def filter_price(result):
     if result and isinstance(result, dict) and 'details' in result and result['details']:
@@ -60,11 +65,15 @@ def choose_best_result(results):
 def initial_task(brand, sku):
     # Logic to generate a list based on brand and sku
     brand_settings = BrandSettings(json.loads(open(BRANDSETTINGSPATH,encoding='utf-8').read()))
+
     out = SKUManager(brand_settings, sku, brand).variations
-    print(out,"------------------------------------------")
     if out:
+        print(out,"------------------------------------------")
         print("Sku Variation Len: ",len(out))
         return out
+    else:
+        return None
+
 @shared_task
 def process_group_results(results):
     # Process results from group, potentially just aggregating them
@@ -155,7 +164,9 @@ def classify_urls(url_list):
 
 @shared_task(bind=True)
 def execute_and_return_chord_result(self, data, brand):
-    data = data or []
+    if not data:
+       data = []
+        
     # Setup the tasks to be executed in parallel within the group
     tasks_group = [fetch_and_parse_html.s(url_info, brand) for url_info in data]
     # Specify the callback task to process results after the group has finished
