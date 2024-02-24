@@ -2,7 +2,13 @@ import json,re,requests,logging
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 from tasks.LR import LR
+
 import re
+
+from tasks.classes_and_utility import BrandSettings
+from settings import BRANDSETTINGSPATH
+
+
 class SKUManager:
     def __init__(self,sku, brand=None):
         self.variations=self.generate_variations(sku, brand)
@@ -320,15 +326,16 @@ class FilterUrls:
         self.prepared_whitelisted_domains = [domain.replace('www.', '') for domain in self.whitelisted_domains]
         self.brand = brand.lower()
         self.sku = sku.lower()
-        self.url_dicts_nodups = self.remove_duplicates(url_dicts)
+        self.url_dicts_nodups = self.remove_dups(url_dicts)
         self.filtered_result = self.filter_image_dict(self.url_dicts_nodups)
         
         
         #self.filtered_url_dicts = self.filter_urls(self.url_dicts_nodups)
 
 
-
-
+    def get_brand_names(self,brand):
+        brand_settings = BrandSettings(json.loads(open(BRANDSETTINGSPATH,encoding='utf-8').read())).get_brand_img_names(brand)
+        return brand_settings  
 
     def get_indices(self,s):
             non_alnum_indexes = []
@@ -494,7 +501,8 @@ class FilterUrls:
 
     def get_score_1(self,url:str,description:str, sku:str,brand:str, point_dict:dict):
         possible_amc=self.segment_workflow(sku,brand)
-        brand_names_unclean=["ysl", "yves saint laurent", "saint laurent", "saint-laurent"] # to be implemented returns all possible ways that the brand name may be in the url/description i.e YSL, Yves Saint Laurent, etc
+        brand_names_unclean = self.get_brand_names(brand)
+        #brand_names_unclean=["ysl", "yves saint laurent", "saint laurent", "saint-laurent"] # to be implemented returns all possible ways that the brand name may be in the url/description i.e YSL, Yves Saint Laurent, etc
         brand_names=[]
         for brand in brand_names_unclean:
             brand_names.append(self.clean_string(brand))
@@ -560,7 +568,9 @@ class FilterUrls:
     
     def get_score_2(self,url: str, description: str, sku: str, brand: str, point_dict: dict):
         possible_amc = self.segment_workflow(sku, brand)
-        brand_names_unclean = ["ysl", "yves saint laurent", "saint laurent", "saint-laurent"]
+        
+        brand_names_unclean = self.get_brand_names(brand)
+        
         brand_names = [self.clean_string(brand) for brand in brand_names_unclean]
         brand_names = self.remove_duplicates(brand_names)
         print(f"This is the brand names {brand_names}")
@@ -771,14 +781,14 @@ class FilterUrls:
         return filtered_url_dicts
 
 
-    # def remove_duplicates(self, url_dicts):
-    #     seen = set()
-    #     new_list = []
-    #     for url_dict in url_dicts:
-    #         if url_dict['url'] not in seen:
-    #             seen.add(url_dict['url'])
-    #             new_list.append(url_dict)
-    #     return new_list
+    def remove_dups(self, url_dicts):
+        seen = set()
+        new_list = []
+        for url_dict in url_dicts:
+            if url_dict['url'] not in seen:
+                seen.add(url_dict['url'])
+                new_list.append(url_dict)
+        return new_list
 # class FilterUrls:
 #     def __init__(self, list_url, brand, sku):
 #         self.whitelisted_domains = [
@@ -861,7 +871,8 @@ class FilterUrls:
 #             print("2_filter",self.filtered_urls)
             
             
-            
+
+  
             
 #     def remove_duplicates(self,input_list):
 #         """

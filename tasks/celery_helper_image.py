@@ -85,8 +85,7 @@ def process_group_results(results):
 def get_brand_domains(brand):
     brand_settings = BrandSettings(json.loads(open(BRANDSETTINGSPATH,encoding='utf-8').read())).get_brand_img_domains(brand)
     return brand_settings
-    
-    
+ 
     
 @shared_task
 def process_item(item,brand):#get html and return list of parsed google urls
