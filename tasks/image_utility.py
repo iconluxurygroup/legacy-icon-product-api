@@ -500,70 +500,74 @@ class FilterUrls:
         return new_lst
 
     def get_score_1(self,url:str,description:str, sku:str,brand:str, point_dict:dict):
-        possible_amc=self.segment_workflow(sku,brand)
-        brand_names_unclean = self.get_brand_names(brand)
-        #brand_names_unclean=["ysl", "yves saint laurent", "saint laurent", "saint-laurent"] # to be implemented returns all possible ways that the brand name may be in the url/description i.e YSL, Yves Saint Laurent, etc
-        brand_names=[]
-        for brand in brand_names_unclean:
-            brand_names.append(self.clean_string(brand))
-        brand_names=self.remove_duplicates(brand_names)
-        print(f"This is the brand names {brand_names}")
-        possible_scores=[]
-        current_score=0
-        article_score_value=point_dict["article"] #change these values as needed
-        model_score_value=point_dict["model"] #change these values as needed
-        color_score_value=point_dict["color"] #change these values as needed
-        brand_score_value=point_dict["brand"] #change these values as needed
-        threshold=point_dict["threshold"] #change these values as needed
-        url=self.clean_string(url)
-        description=self.clean_string(description)
-        for amc_dict in possible_amc:
-            print(amc_dict)
-            for key,value in amc_dict.items():
-                value=self.clean_string(value)
-                print(f"This is the new value {value}")
-                if key=="article":
-                    if value in url:
-                        print(f"Got a point for {value}")
-                        current_score+=article_score_value 
-                    if value in description:
-                        print(f"Got a point for {value}")
-                        current_score+=article_score_value
-                elif key=="model":
-                    if value in url:
-                        print(f"Got a point for {value}")
-                        current_score+=model_score_value 
-                    if value in description:
-                        print(f"Got a point for {value}")
-                        current_score+=model_score_value
-                elif key=="color":
-                    if value in url:
-                        print(f"Got a point for {value}")
-                        current_score+=color_score_value 
-                    if value in description:
-                        print(f"Got a point for {value}")
-                        current_score+=color_score_value
-                
-            for brand in brand_names:
-                brand=self.clean_string(brand)
-                if brand in url:
-                    print(f"Got a point for {brand}")
-                    current_score+=brand_score_value
-                elif brand in description:
-                    print(f"Got a point for {brand}")
-                    current_score+=brand_score_value
-                
-        
-            possible_scores.append(current_score)
-            print(f"This score: {current_score} came from this dict {amc_dict}")
+            possible_amc=self.segment_workflow(sku,brand)
+            brand_names_unclean = self.get_brand_names(brand)
+            #brand_names_unclean=["ysl", "yves saint laurent", "saint laurent", "saint-laurent"] # to be implemented returns all possible ways that the brand name may be in the url/description i.e YSL, Yves Saint Laurent, etc
+            brand_names=[]
+            for brand in brand_names_unclean:
+                brand_names.append(self.clean_string(brand))
+            brand_names=self.remove_duplicates(brand_names)
+            print(f"This is the brand names {brand_names}")
+            possible_scores=[]
+            print(f"This is the possible scores {possible_scores}")
             current_score=0
+            print(f"This is the current scores {current_score}")
+            article_score_value=point_dict["article"] #change these values as needed
+            model_score_value=point_dict["model"] #change these values as needed
+            color_score_value=point_dict["color"] #change these values as needed
+            brand_score_value=point_dict["brand"] #change these values as needed
+            threshold=point_dict["threshold"] #change these values as needed
+            print(f"This is the threshold {threshold}")
+            
+            url=self.clean_string(url)
+            description=self.clean_string(description)
+            for amc_dict in possible_amc:
+                print(amc_dict)
+                for key,value in amc_dict.items():
+                    value=self.clean_string(value)
+                    print(f"This is the new value {value}")
+                    if key=="article":
+                        if value in url:
+                            print(f"Got a point for {value}")
+                            current_score+=article_score_value 
+                        if value in description:
+                            print(f"Got a point for {value}")
+                            current_score+=article_score_value
+                    elif key=="model":
+                        if value in url:
+                            print(f"Got a point for {value}")
+                            current_score+=model_score_value 
+                        if value in description:
+                            print(f"Got a point for {value}")
+                            current_score+=model_score_value
+                    elif key=="color":
+                        if value in url:
+                            print(f"Got a point for {value}")
+                            current_score+=color_score_value 
+                        if value in description:
+                            print(f"Got a point for {value}")
+                            current_score+=color_score_value
+                    
+                for brand in brand_names:
+                    brand=self.clean_string(brand)
+                    if brand in url:
+                        print(f"Got a point for {brand}")
+                        current_score+=brand_score_value
+                    elif brand in description:
+                        print(f"Got a point for {brand}")
+                        current_score+=brand_score_value
+                    
+            
+                possible_scores.append(current_score)
+                print(f"This score: {current_score} came from this dict {amc_dict}")
+                current_score=0
 
-        print(f"These are all the possible scores {possible_scores}")
-        filtered_scores=[]
-        for score in possible_scores:
-            if score>=threshold:
-                filtered_scores.append(score)
-        return filtered_scores
+            print(f"These are all the possible scores {possible_scores}")
+            filtered_scores=[]
+            for score in possible_scores:
+                if score>=threshold:
+                    filtered_scores.append(score)
+            return filtered_scores
     
     
     def get_score_2(self,url: str, description: str, sku: str, brand: str, point_dict: dict):
