@@ -26,10 +26,19 @@ class BrandSettings:
         return None
     def get_brand_img_domains(self, brand_name):
         # Convert brand_name to lowercase for case-insensitive comparison
-        return self.get_rules_for_brand(brand_name).get('image_domain', [])
+        brand_rules = self.get_rules_for_brand(brand_name)
+        if brand_rules:
+            return brand_rules.get('image_domain', [])
+        else:
+            return None
+
     def get_brand_img_names(self, brand_name):
         # Convert brand_name to lowercase for case-insensitive comparison
-        return self.get_rules_for_brand(brand_name).get('names', [])
+        brand_rules = self.get_rules_for_brand(brand_name)
+        if brand_rules:
+            return brand_rules.get('names', [])
+        else:
+            return None
     #FETCH SETTINGS REMOTELY FROM S3 or wtv.
     # def fetch_remote_config(url):
         # response = requests.get(url)

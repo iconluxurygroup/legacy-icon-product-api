@@ -168,7 +168,11 @@ def filter_results(url_list_with_items, brand, sku):
         return []# Return immediately if no URLs are provided????????????????????????______________________________
 
     filter_urls_instance = FilterUrls(url_list_with_items, brand, sku)
-    return filter_urls_instance.filtered_result
+    filter_results = filter_urls_instance.filtered_result
+    if (type(filter_results) == list) and (len(filter_results) > 1):
+        return filter_results[0]
+    else:
+        return filter_results
 # @shared_task
 # def combine_results(results_with_items):
 #     print(results_with_items)
