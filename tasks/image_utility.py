@@ -471,13 +471,15 @@ class FilterUrls:
 
 
 
-    def clean_string(self,input_string):
+    def clean_string(self, input_string):
         # Remove all non-alphanumeric characters except spaces using regex
-        cleaned = re.sub(r'[^a-zA-Z0-9]+', '', input_string)
+        cleaned = re.sub(r'[^a-zA-Z0-9 ]+', '', input_string)
         
-        # Replace multiple spaces with a single space and strip whitespace from the ends
+        # Replace multiple spaces with a single space
         cleaned = ' '.join(cleaned.split())
-        cleaned=cleaned.lower()
+
+        # Convert to lowercase and strip whitespace from the ends
+        cleaned = cleaned.lower().strip()
         return cleaned
 
 
@@ -644,17 +646,19 @@ class FilterUrls:
                         value=self.clean_string(value)
                         if value in url:
                                 print(f"Got a point for {value} in url {url}")
-                                current_score+=1 
+                                current_score+=0.5 
                         if value in description:
                                 print(f"Got a point for {value} in description{description}")
                                 current_score+=1
                     for brand in brand_names:
                         brand=self.clean_string(brand)
+                        print(brand)
                         if brand in url:
-                            print(f"Got a point for {brand}")
+                            print(f"Got a point for {brand} Value: {brand_score_value}")
+                            print(url)
                             current_score+=brand_score_value
                         elif brand in description:
-                            print(f"Got a point for {brand}")
+                            print(f"Got a point for {brand} Value: {brand_score_value}")
                             current_score+=brand_score_value
                         
                 
@@ -709,7 +713,7 @@ class FilterUrls:
                         brand = self.clean_string(brand)
                         if brand in url or brand in description:
                             if not brand_score_added:  # Ensure we only add the brand score once
-                                print(f"Got a point for {brand}")
+                                print(f"Got a point for {brand} Value: {brand_score_value}")
                                 current_score += brand_score_value
                                 brand_score_added = True
     
