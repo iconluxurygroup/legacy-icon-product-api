@@ -46,4 +46,4 @@ up:
 down:
 	docker-compose down
 
-all: install lint test build
+all: install lint build up

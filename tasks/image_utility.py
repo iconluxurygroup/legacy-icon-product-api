@@ -1,12 +1,48 @@
-import json,re,requests,logging
+import json,re,requests,logging,base64
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 from tasks.LR import LR
-
+import zlib
 import re
 
 from tasks.classes_and_utility import BrandSettings
 from settings import BRANDSETTINGSPATH
+from html.parser import HTMLParser
+import html
+
+from html.parser import HTMLParser
+import html
+# Enhanced HTML Parser for extracting specific image data
+class EnhancedHTMLParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.items = []
+        self.current_item = {}
+        self.collecting_data = False
+
+    def handle_starttag(self, tag, attrs):
+        attrs_dict = dict(attrs)
+        if tag == 'td' and 'align' in attrs_dict and attrs_dict['align'] == 'center':
+            self.collecting_data = True
+            self.current_item = {'thumbnail_url': '', 'description': '', 'website': ''}
+        elif tag == 'img' and self.collecting_data:
+            self.current_item['thumbnail_url'] = attrs_dict.get('src', '')
+        elif tag == 'a' and self.collecting_data:
+            self.current_item['website'] = attrs_dict.get('href', '').split('?q=')[1].split('&')[0] if '?q=' in attrs_dict.get('href', '') else ''
+
+    def handle_data(self, data):
+        if self.collecting_data:
+            if 'description' not in self.current_item or not self.current_item['description']:
+                self.current_item['description'] = data
+
+    def handle_endtag(self, tag):
+        if tag == 'td' and self.collecting_data:
+            self.items.append(self.current_item)
+            self.collecting_data = False
+            self.current_item = {}
+
+    def error(self, message):
+        print(f"An error occurred: {message}")
 
 
 class SKUManager:
@@ -55,9 +91,9 @@ class SKUManager:
     #     return [sku,str(sku) + ' ' + str(brand)]
     def handle_sku(self,sku,brand):
         indices=self.get_indices(sku)
-        variations=[sku]
+        variations=[sku,str(sku)+' ' +str(brand)]
         if len(indices)>=4:
-            return None
+            return variations
         elif len(indices)==2:
             article=sku[:indices[0]]
             model=sku[indices[0]+1:indices[1]]
@@ -149,72 +185,126 @@ class SKUManager:
         cleaned = re.sub(r'[^a-zA-Z0-9]', '', sku)
         logging.info(f"Cleaned SKU: {cleaned}")
         return cleaned
-    
+
+
 class SearchEngine:
     def __init__(self,variation):
         self.parsed_results = []
+        ###place holder for html body
+        self.str_html_body = ""
         self.descriptions = []
         self.variation = variation
-        self.query_url = self.search_query(variation)
-        self.g_html_response = self.send_regular_request(self.query_url)
+        #!SCRAPER API DEPENDS ON search_query
+        #self.query_url = self.search_query(variation)
+        #self.g_html_response = self.send_regular_request_SCRAPERAPI(self.query_url)
+        #RETURNS HTML
+        self.g_html_response = self.get_google_image_nimble(self.variation)
+        print(f"Status Code : {self.g_html_response['status']}")
         if self.g_html_response['status'] == 200:
-            self.parsed_results = self.parse_google_images(self.g_html_response['body'])
-            if "Looks like there aren’t any matches for your search" in self.parsed_results:
+            self.str_html_body = self.g_html_response['body']
+            #print(self.str_html_body)
+            if "Looks like there aren’t any matches for your search" in self.str_html_body:
                 print("NO PRODUCT FOUND")
                 return None               
 
-            elif "Looks like there aren’t any matches for your search" not in self.parsed_results:
-                hiQResponse = self.get_original_images(self.parsed_results)[0]
-                Descrip = self.get_original_images(self.parsed_results)[1]
+            elif "Looks like there aren’t any matches for your search" not in self.str_html_body:
+                print('Looking!')
+                hiQResponse = self.get_original_images(self.str_html_body)[0]
+                Descrip = self.get_original_images(self.str_html_body)[1]
+
+                ##parser = EnhancedHTMLParser()
+
+                # Step 3: Feed the HTML Content to the Parser
+                ##parser.feed(self.str_html_body)
+
+                # Step 4: Access Extracted Items
+                ##for item in parser.items:
+                ##    print('----------------------')
+                ##    print(item)
+                ##    print('XXXXXXXXXXXXXXXXXXXXXX')
+                ##    self.parsed_results.append(item)
+##
+##
+                ##print('XXXXXXXXXXXXXXXXXXXXXX')
+                ##print(self.parsed_results)
+                ##print('+++++++++++++++++++++++++++++')
+
+
                 if hiQResponse:
                     self.parsed_results = hiQResponse
                     self.descriptions = Descrip
-                
-                               
+                    print(f"Parsed Url: {self.parsed_results}\nDescriptions: {self.descriptions}")
+    def get_google_image_nimble(self, query):
+        func_url = 'https://faas-nyc1-2ef2e6cc.doserverless.co/api/v1/web/fn-af66235d-5f26-40d2-8836-25a71fef3192/default/image-function-2'
+        headers = {
+    'Content-Type': 'application/json',
+}
+        #payload = { 'api_key': 'ab75344fcf729c63c9665e8e8a21d985', 'url': url, 'country_code': 'us'}
+    #    payload = { 'api_key': 'ab75344fcf729c63c9665e8e8a21d985', 'url': url}
+        r = requests.get(f'{func_url}?query={query}', headers=headers,timeout=180)
+        print(r.status_code)
+        response_json = r.json()
+        #print(response_json)
+        return {'status': r.status_code, 'body': self.unpack_content(response_json.get('body',None))}  
+
+    def unpack_content(self,encoded_content):
+        if encoded_content:
+            compressed_content = base64.b64decode(encoded_content)
+            original_content = zlib.decompress(compressed_content)
+            return str(original_content)  # Return as binary data
+        return None
+
+
      
-     
-    def send_regular_request(self, url):
+    def send_regular_request_SCRAPERAPI(self, url):
         payload = { 'api_key': 'ab75344fcf729c63c9665e8e8a21d985', 'url': url, 'country_code': 'us'}
     #    payload = { 'api_key': 'ab75344fcf729c63c9665e8e8a21d985', 'url': url}
         r = requests.get('https://api.scraperapi.com/', params=payload,timeout=120)
         return {'status': r.status_code, 'body': r.text}
-    #    
-    def search_query(self, sku):
+    #   
+    # 
+    #!SCRAPER API NEEDS THIS  
+    #def search_query(self, sku):
         #query = f"\"{sku}\""
         
-        return f"https://www.google.com/search?q={sku}&newwindow=1&tbm=isch&safe=active"
+        #return f"https://www.google.com/search?q={sku}&newwindow=1&tbm=isch&safe=active"
 
-    @staticmethod
-    def parse_google_images(html_content):
-        soup = BeautifulSoup(html_content, 'html.parser')
-        #  results = []
-        #  for g in soup.find_all('div', class_='g'):
-        #      links = g.find_all('a')
-        #      if links and 'href' in links[0].attrs:  # check if 'href' attribute exists
-        #          results.append(links[0]['href'])
-        return soup
+    # @staticmethod
+    # def parse_google_images(html_content):
+    #     soup = BeautifulSoup(html_content, 'html.parser')
+    #     #soup = BeautifulSoup(html_content, 'lxml')
+    #     #  results = []
+    #     #  for g in soup.find_all('div', class_='g'):
+    #     #      links = g.find_all('a')
+    #     #      if links and 'href' in links[0].attrs:  # check if 'href' attribute exists
+    #     #          results.append(links[0]['href'])
+    #     return soup
     
-    def get_original_images(self,soup):
-
+    def get_original_images(self,html):
+        soup = BeautifulSoup(html, 'html.parser')
         all_script_tags = soup.select("script")
 
         # Extract matched images data
         matched_images_data = "".join(re.findall(r"AF_initDataCallback\(([^<]+)\);", str(all_script_tags)))
-
+        #matched_images_data = "".join(re.findall(r"AF_initDataCallback\(({key: 'ds:1'.*?)\);</script>", str(all_script_tags)))
+        print(matched_images_data)
         matched_images_data_fix = json.dumps(matched_images_data)
+        print(matched_images_data)
         matched_images_data_json = json.loads(matched_images_data_fix)
-
+        print(matched_images_data_json)
         matched_google_image_data = re.findall(r'\"b-GRID_STATE0\"(.*)sideChannel:\s?{}}', matched_images_data_json)
-
+        print(matched_google_image_data)
         # Extract thumbnails
         matched_google_images_thumbnails = ", ".join(
             re.findall(r'\[\"(https\:\/\/encrypted-tbn0\.gstatic\.com\/images\?.*?)\",\d+,\d+\]',
                     str(matched_google_image_data))).split(", ")
-
+        print(matched_google_images_thumbnails)
         thumbnails = [
             bytes(bytes(thumbnail, "ascii").decode("unicode-escape"), "ascii").decode("unicode-escape") for thumbnail in matched_google_images_thumbnails
         ]
-
+        ##########
+        print('thumbnails')
+        print(thumbnails)
         removed_matched_google_images_thumbnails = re.sub(
             r'\[\"(https\:\/\/encrypted-tbn0\.gstatic\.com\/images\?.*?)\",\d+,\d+\]', "", str(matched_google_image_data))
 
