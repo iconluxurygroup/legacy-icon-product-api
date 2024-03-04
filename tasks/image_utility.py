@@ -87,9 +87,9 @@ class SKUManager:
             if not char.isalnum():
                 non_alnum_indexes.append(i)
         return  non_alnum_indexes
-    # def handle_sku(self,sku,brand):
-    #     return [sku,str(sku) + ' ' + str(brand)]
     def handle_sku(self,sku,brand):
+         return [sku,str(sku) + ' ' + str(brand)]
+    def handle_sku_disabled(self,sku,brand):
         indices=self.get_indices(sku)
         variations=[sku,str(sku)+' ' +str(brand)]
         if len(indices)>=4:
@@ -200,6 +200,7 @@ class SearchEngine:
         #RETURNS HTML
         self.g_html_response = self.get_google_image_nimble(self.variation)
         print(f"Status Code : {self.g_html_response['status']}")
+        
         if self.g_html_response['status'] == 200:
             self.str_html_body = self.g_html_response['body']
             #print(self.str_html_body)
@@ -244,6 +245,7 @@ class SearchEngine:
         r = requests.get(f'{func_url}?query={query}', headers=headers,timeout=180)
         print(r.status_code)
         response_json = r.json()
+        print(response_json)
         #print(response_json)
         return {'status': r.status_code, 'body': self.unpack_content(response_json.get('body',None))}  
 
@@ -251,6 +253,7 @@ class SearchEngine:
         if encoded_content:
             compressed_content = base64.b64decode(encoded_content)
             original_content = zlib.decompress(compressed_content)
+            print(original_content)
             return str(original_content)  # Return as binary data
         return None
 
@@ -883,7 +886,7 @@ class FilterUrls:
         elif len(second_pass)==1:
             return second_pass[0]
         
-        third_pass=[]
+        #third_pass=[]
         for image_dict in second_pass:
             url=image_dict["url"]
             brand_domains=image_dict["brand_domains"]
