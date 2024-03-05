@@ -4,14 +4,12 @@ from bs4 import BeautifulSoup
 from tasks.LR import LR
 import zlib
 import re
-
+import codecs
 from tasks.classes_and_utility import BrandSettings
 from settings import BRANDSETTINGSPATH
 from html.parser import HTMLParser
 import html
 
-from html.parser import HTMLParser
-import html
 # Enhanced HTML Parser for extracting specific image data
 class EnhancedHTMLParser(HTMLParser):
     def __init__(self):
@@ -189,10 +187,8 @@ class SKUManager:
 
 class SearchEngine:
     def __init__(self,variation):
-        self.parsed_results = []
         ###place holder for html body
         self.str_html_body = ""
-        self.descriptions = []
         self.variation = variation
         #!SCRAPER API DEPENDS ON search_query
         #self.query_url = self.search_query(variation)
@@ -211,6 +207,7 @@ class SearchEngine:
             elif "Looks like there aren’t any matches for your search" not in self.str_html_body:
                 print('Looking!')
                 hiQResponse = self.get_original_images(self.str_html_body)[0]
+                
                 Descrip = self.get_original_images(self.str_html_body)[1]
 
                 ##parser = EnhancedHTMLParser()
@@ -235,6 +232,11 @@ class SearchEngine:
                     self.parsed_results = hiQResponse
                     self.descriptions = Descrip
                     print(f"Parsed Url: {self.parsed_results}\nDescriptions: {self.descriptions}")
+
+                else:
+                    self.parsed_results = []
+                    self.descriptions = []
+                    print(f"Parsed Url: {self.parsed_results}\nDescriptions: {self.descriptions}")
     def get_google_image_nimble(self, query):
         func_url = 'https://faas-nyc1-2ef2e6cc.doserverless.co/api/v1/web/fn-af66235d-5f26-40d2-8836-25a71fef3192/default/image-function-2'
         headers = {
@@ -245,7 +247,7 @@ class SearchEngine:
         r = requests.get(f'{func_url}?query={query}', headers=headers,timeout=180)
         print(r.status_code)
         response_json = r.json()
-        print(response_json)
+        #print(response_json)
         #print(response_json)
         return {'status': r.status_code, 'body': self.unpack_content(response_json.get('body',None))}  
 
@@ -253,7 +255,6 @@ class SearchEngine:
         if encoded_content:
             compressed_content = base64.b64decode(encoded_content)
             original_content = zlib.decompress(compressed_content)
-            print(original_content)
             return str(original_content)  # Return as binary data
         return None
 
@@ -285,8 +286,7 @@ class SearchEngine:
     
     # def get_original_images(self,html):
     #     soup = BeautifulSoup(html, 'html.parser')
-    #     all_script_tags = soup.select("script")
-
+    #     all_script_tags = soup.select("script") 
     #     # Extract matched images data
     #     matched_images_data = "".join(re.findall(r"AF_initDataCallback\(([^<]+)\);", str(all_script_tags)))
     #     #matched_images_data = "".join(re.findall(r"AF_initDataCallback\(({key: 'ds:1'.*?)\);</script>", str(all_script_tags)))
@@ -309,22 +309,17 @@ class SearchEngine:
     #     print('thumbnails')
     #     print(thumbnails)
     #     removed_matched_google_images_thumbnails = re.sub(
-    #         r'\[\"(https\:\/\/encrypted-tbn0\.gstatic\.com\/images\?.*?)\",\d+,\d+\]', "", str(matched_google_image_data))
-
+    #         r'\[\"(https\:\/\/encrypted-tbn0\.gstatic\.com\/images\?.*?)\",\d+,\d+\]', "", str(matched_google_image_data))  
     #     # Extract full resolution images
-    #     matched_google_full_resolution_images = re.findall(r"(?:'|,),\[\"(https:|http.*?)\",\d+,\d+\]", removed_matched_google_images_thumbnails)
-
+    #     matched_google_full_resolution_images = re.findall(r"(?:'|,),\[\"(https:|http.*?)\",\d+,\d+\]", removed_matched_google_images_thumbnails)   
     #     full_res_images = [
     #         bytes(bytes(img, "ascii").decode("unicode-escape"), "ascii").decode("unicode-escape") for img in matched_google_full_resolution_images
-    #     ]
-
+    #     ]   
     #     # Assume descriptions are extracted
-    #     descriptions = LR().get(soup, '"2008":[null,"', '"]}],null,') # Replace 'description_pattern' with your actual regex pattern for descriptions
-
+    #     descriptions = LR().get(soup, '"2008":[null,"', '"]}],null,') # Replace 'description_pattern' with your actual regex pattern for descriptions   
     #     final_thumbnails = []
     #     final_full_res_images = []
-    #     final_descriptions = []
-
+    #     final_descriptions = [] 
     #     # Iterate over each thumbnail
     #     for i, thumbnail in enumerate(thumbnails):
     #         try:
@@ -334,56 +329,54 @@ class SearchEngine:
     #             final_descriptions.append(descriptions[i])
     #         except IndexError:
     #             # If there is an index error, it means a description could not be found for the current thumbnail. So skip this thumbnail.
-    #             continue
+    #             continue    
+    #     return final_full_res_images, final_descriptions,final_thumbnails   
+    def get_original_images(self,html):
+        matched_images_data = "".join(re.findall(r"AF_initDataCallback\(([^<]+)\);", str(html)))
 
-    #     return final_full_res_images, final_descriptions,final_thumbnails
-    
+        matched_images_data_fix = json.dumps(matched_images_data)
+        matched_images_data_json = json.loads(matched_images_data_fix)
 
+        matched_google_image_data = re.findall(r'\"b-GRID_STATE0\"(.*)sideChannel:\s?{}}', matched_images_data_json)
 
+        # Extract thumbnails
+        matched_google_images_thumbnails = ", ".join(
+            re.findall(r'\[\"(https\:\/\/encrypted-tbn0\.gstatic\.com\/images\?.*?)\",\d+,\d+\]',
+                    str(matched_google_image_data))).split(", ")
 
-    def get_original_images(self, html):
-        soup = BeautifulSoup(html, 'html.parser')
-        all_script_tags = soup.find_all("script")
+        thumbnails = [
+            bytes(bytes(thumbnail, "ascii").decode("unicode-escape"), "ascii").decode("unicode-escape") for thumbnail in matched_google_images_thumbnails
+        ]
+        
+        removed_matched_google_images_thumbnails = re.sub(
+            r'\[\"(https\:\/\/encrypted-tbn0\.gstatic\.com\/images\?.*?)\",\d+,\d+\]', "", str(matched_google_image_data))
 
-        # Initialize lists to hold extracted data
-        thumbnails = []
-        full_res_images = []
-        descriptions = []
+        # Extract full resolution images
+        matched_google_full_resolution_images = re.findall(r"(?:'|,),\[\"(https:|http.*?)\",\d+,\d+\]", removed_matched_google_images_thumbnails)
 
-        # Iterate through each script tag in the HTML
-        for script in all_script_tags:
-            if 'AF_initDataCallback' in script.text:
-                # Find JSON blobs by regex within script tags
-                matches = re.findall(r"AF_initDataCallback\((\{.*?\})\);", script.text, re.DOTALL)
-                for match in matches:
-                    try:
-                        # Clean and parse the JSON data
-                        cleaned_match = re.sub(r'\\x22', '"', match)
-                        cleaned_match = re.sub(r'\\x3d', '=', cleaned_match)
-                        json_data = json.loads(cleaned_match)
-                        
-                        # Assuming 'data' in json_data contains the images info
-                        # The exact key/path to image data may vary
-                        if 'data' in json_data and 'first_party' in json_data['data']:
-                            images_data = json_data['data']['first_party']
-                            for image in images_data:
-                                # Extract and decode thumbnail URLs
-                                thumbnail_url = image.get('thumbnail', {}).get('url', '')
-                                thumbnails.append(thumbnail_url)
+        full_res_images = [
+            bytes(bytes(img, "ascii").decode("unicode-escape"), "ascii").decode("unicode-escape") for img in matched_google_full_resolution_images
+        ]
 
-                                # Extract and decode full resolution image URLs
-                                full_res_url = image.get('full_resolution', {}).get('url', '')
-                                full_res_images.append(full_res_url)
+        # Assume descriptions are extracted
+        descriptions = LR().get(html, '"2008":[null,"', '"]}],null,') # Replace 'description_pattern' with your actual regex pattern for descriptions
+        #descriptions = []
+        final_thumbnails = []
+        final_full_res_images = []
+        final_descriptions = []
 
-                                # Extract descriptions if available
-                                description = image.get('description', '')
-                                descriptions.append(description)
-                    except json.JSONDecodeError as e:
-                        print(f"JSON decode error: {e}")
-                        continue
+        # Iterate over each thumbnail
+        for i, thumbnail in enumerate(thumbnails):
+            try:
+                # If a full resolution image exists, add it. If not, add the thumbnail instead.
+                final_thumbnails.append(thumbnail)
+                final_full_res_images.append(full_res_images[i] if i < len(full_res_images) else thumbnail)
+                final_descriptions.append(descriptions[i])
+            except IndexError:
+                # If there is an index error, it means a description could not be found for the current thumbnail. So skip this thumbnail.
+                continue
 
-        return full_res_images, descriptions , thumbnails
-         
+        return final_full_res_images, final_descriptions,final_thumbnails
 
 from urllib.parse import urlparse
 
