@@ -1,4 +1,4 @@
-import json,re,requests,logging,base64,random
+import json,re,requests,logging,base64,random,time
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 from tasks.LR import LR
@@ -259,40 +259,76 @@ class SearchEngine:
 
 
 
+    # def get_google_image_nimble(self, query):
+    #     serverless_urls = self.fetch_serverless_no_js_url(str(SERVERLESS_URL_SETTINGS))
+    #     if not serverless_urls:
+    #         return {'status': 404, 'body': "Failed to obtain serverless URLs."}
+        
+    #     attempt_delay = 1  # Start with a 1 second delay
+    #     max_attempts = 3
+    #     for attempt in range(max_attempts):
+    #         func_url = random.choice(serverless_urls)  # Select a URL at random
+    #         print(f"Attempt {attempt+1}: Current Url: {func_url}")
+    #         headers = {'Content-Type': 'application/json'}
+
+    #         try:
+    #             response = requests.get(f'{func_url}?query={query}', headers=headers, timeout=185)
+    #             if response.status_code == 200:
+    #                 response_json = response.json()
+    #                 result = response_json.get('body', None)
+    #                 if result:
+    #                     return {'status': response.status_code, 'body': self.unpack_content(result)}
+    #             else:
+    #                 print(f"Request failed with status code: {response.status_code}")
+    #         except requests.RequestException as e:
+    #             print(f"Error making request: {e}")
+
+    #         time.sleep(attempt_delay)  # Apply the delay
+    #         attempt_delay *= 2  # Exponentially increase the delay for the next attempt
+
+    #         # Remove the failed URL from the list to avoid retrying it
+    #         serverless_urls.remove(func_url)
+    #         if not serverless_urls:  # If we've exhausted all URLs
+    #             print("Exhausted all serverless URLs.")
+    #             break
+
+    #     return {'status': 404, 'body': "Failed after all attempts."}
+
     def get_google_image_nimble(self, query):
         serverless_urls = self.fetch_serverless_no_js_url(str(SERVERLESS_URL_SETTINGS))
         if not serverless_urls:
             return {'status': 404, 'body': "Failed to obtain serverless URLs."}
         
+        last_used_url = None
         attempt_delay = 1  # Start with a 1 second delay
-        max_attempts = 3
-        for attempt in range(max_attempts):
-            func_url = random.choice(serverless_urls)  # Select a URL at random
-            print(f"Attempt {attempt+1}: Current Url: {func_url}")
+
+        for _ in range(len(serverless_urls) * 3):  # Total attempts: thrice the number of serverless URLs
+            # Select a random URL avoiding the last used one
+            current_urls = [url for url in serverless_urls if url != last_used_url]
+            func_url = random.choice(current_urls)
+
+            print(f"Using URL: {func_url}")
             headers = {'Content-Type': 'application/json'}
 
             try:
                 response = requests.get(f'{func_url}?query={query}', headers=headers, timeout=185)
                 if response.status_code == 200:
                     response_json = response.json()
-                    return {'status': response.status_code, 'body': self.unpack_content(response_json.get('body', None))}
+                    result = response_json.get('body', None)
+                    if result:  # If result is not None, unpack and return
+                        return {'status': response.status_code, 'body': self.unpack_content(result)}
+                    # If result is None, proceed to retry with a different URL
                 else:
                     print(f"Request failed with status code: {response.status_code}")
             except requests.RequestException as e:
                 print(f"Error making request: {e}")
 
+            last_used_url = func_url  # Update last used URL
             time.sleep(attempt_delay)  # Apply the delay
-            attempt_delay *= 2  # Exponentially increase the delay for the next attempt
+            attempt_delay = min(attempt_delay * 2, 60)  # Exponentially increase the delay, up to a max of 60 seconds
 
-            # Remove the failed URL from the list to avoid retrying it
-            serverless_urls.remove(func_url)
-            if not serverless_urls:  # If we've exhausted all URLs
-                print("Exhausted all serverless URLs.")
-                break
-
+        # After trying all URLs without success
         return {'status': 404, 'body': "Failed after all attempts."}
-
-
 
 
 #     def get_google_image_nimble(self, query):
