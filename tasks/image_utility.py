@@ -1,12 +1,10 @@
-import json,re,requests,logging,base64
+import json,re,requests,logging,base64,random
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 from tasks.LR import LR
 import zlib
-import re
-import codecs
 from tasks.classes_and_utility import BrandSettings
-from settings import BRANDSETTINGSPATH
+from settings import BRANDSETTINGSPATH,SERVERLESS_URL_SETTINGS
 from html.parser import HTMLParser
 import html
 
@@ -237,19 +235,81 @@ class SearchEngine:
                     self.parsed_results = []
                     self.descriptions = []
                     print(f"Parsed Url: {self.parsed_results}\nDescriptions: {self.descriptions}")
+
+
+    def fetch_serverless_no_js_url(self,settings_url, max_retries=3):
+        retries = 0
+        while retries < max_retries:
+            try:
+                response = requests.get(settings_url, headers={'User-Agent': 'Mozilla/5.0'})
+                if response.status_code == 200:
+                    data = response.json()
+                    serverless_urls = data.get("serverless-urls", {}).get("no_js", [])
+                    if serverless_urls:
+                        return serverless_urls
+                retries += 1
+                print(f"Retry {retries}/{max_retries} for fetching serverless URLs...")
+            except requests.RequestException as e:
+                print(f"Failed to fetch serverless URLs: {e}")
+                retries += 1
+        
+        print("Failed to fetch serverless URLs after maximum retries.")
+        return []
+
+
+
+
     def get_google_image_nimble(self, query):
-        func_url = 'https://faas-nyc1-2ef2e6cc.doserverless.co/api/v1/web/fn-af66235d-5f26-40d2-8836-25a71fef3192/default/image-function-2'
-        headers = {
-    'Content-Type': 'application/json',
-}
-        #payload = { 'api_key': 'ab75344fcf729c63c9665e8e8a21d985', 'url': url, 'country_code': 'us'}
-    #    payload = { 'api_key': 'ab75344fcf729c63c9665e8e8a21d985', 'url': url}
-        r = requests.get(f'{func_url}?query={query}', headers=headers,timeout=180)
-        print(r.status_code)
-        response_json = r.json()
-        #print(response_json)
-        #print(response_json)
-        return {'status': r.status_code, 'body': self.unpack_content(response_json.get('body',None))}  
+        serverless_urls = self.fetch_serverless_no_js_url(str(SERVERLESS_URL_SETTINGS))
+        if not serverless_urls:
+            return {'status': 404, 'body': "Failed to obtain serverless URLs."}
+        
+        attempt_delay = 1  # Start with a 1 second delay
+        max_attempts = 3
+        for attempt in range(max_attempts):
+            func_url = random.choice(serverless_urls)  # Select a URL at random
+            print(f"Attempt {attempt+1}: Current Url: {func_url}")
+            headers = {'Content-Type': 'application/json'}
+
+            try:
+                response = requests.get(f'{func_url}?query={query}', headers=headers, timeout=185)
+                if response.status_code == 200:
+                    response_json = response.json()
+                    return {'status': response.status_code, 'body': self.unpack_content(response_json.get('body', None))}
+                else:
+                    print(f"Request failed with status code: {response.status_code}")
+            except requests.RequestException as e:
+                print(f"Error making request: {e}")
+
+            time.sleep(attempt_delay)  # Apply the delay
+            attempt_delay *= 2  # Exponentially increase the delay for the next attempt
+
+            # Remove the failed URL from the list to avoid retrying it
+            serverless_urls.remove(func_url)
+            if not serverless_urls:  # If we've exhausted all URLs
+                print("Exhausted all serverless URLs.")
+                break
+
+        return {'status': 404, 'body': "Failed after all attempts."}
+
+
+
+
+#     def get_google_image_nimble(self, query):
+#         #func_url = 'https://faas-nyc1-2ef2e6cc.doserverless.co/api/v1/web/fn-af66235d-5f26-40d2-8836-25a71fef3192/default/image-function-2'
+#         func_url = self.fetch_serverless_no_js_url(str(SERVERLESS_URL_SETTINGS))
+#         print(f"Current Url: {func_url}")
+#         headers = {
+#     'Content-Type': 'application/json',
+# }
+#         #payload = { 'api_key': 'ab75344fcf729c63c9665e8e8a21d985', 'url': url, 'country_code': 'us'}
+#     #    payload = { 'api_key': 'ab75344fcf729c63c9665e8e8a21d985', 'url': url}
+#         r = requests.get(f'{func_url}?query={query}', headers=headers,timeout=180)
+#         print(r.status_code)
+#         response_json = r.json()
+#         #print(response_json)
+#         #print(response_json)
+#         return {'status': r.status_code, 'body': self.unpack_content(response_json.get('body',None))}  
 
     def unpack_content(self,encoded_content):
         if encoded_content:
@@ -331,7 +391,7 @@ class SearchEngine:
     #             # If there is an index error, it means a description could not be found for the current thumbnail. So skip this thumbnail.
     #             continue    
     #     return final_full_res_images, final_descriptions,final_thumbnails   
-    def get_original_images(self,html):
+    def get_original_images(self, html):
         matched_images_data = "".join(re.findall(r"AF_initDataCallback\(([^<]+)\);", str(html)))
 
         matched_images_data_fix = json.dumps(matched_images_data)
