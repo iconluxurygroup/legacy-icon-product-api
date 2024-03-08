@@ -244,7 +244,9 @@ class SearchEngine:
                 response = requests.get(settings_url, headers={'User-Agent': 'Mozilla/5.0'})
                 if response.status_code == 200:
                     data = response.json()
-                    serverless_urls = data.get("serverless-urls", {}).get("no_js", [])
+                    #nimble
+                    #serverless_urls = data.get("serverless-urls", {}).get("no_js", [])
+                    serverless_urls = data.get("serverless-urls", {}).get("noip_nojs", [])
                     if serverless_urls:
                         return serverless_urls
                 retries += 1
@@ -555,6 +557,7 @@ class FilterUrls:
         self.brand = brand.lower()
         self.sku = sku.lower()
         self.url_dicts_nodups = self.remove_dups(url_dicts)
+
         self.filtered_result = self.filter_image_dict(self.url_dicts_nodups)
         
         
@@ -745,9 +748,7 @@ class FilterUrls:
                 brand_names = self.remove_duplicates(brand_names)
                 print(f"This is the brand names {brand_names}")
             else:
-                brand_names = [brand]
-            #brand_names_unclean=["ysl", "yves saint laurent", "saint laurent", "saint-laurent"] # to be implemented returns all possible ways that the brand name may be in the url/description i.e YSL, Yves Saint Laurent, etc
-            
+                brand_names = [brand]           
             print(f"This is the brand names {brand_names}")
             possible_scores=[]
             print(f"This is the possible scores {possible_scores}")
@@ -1043,7 +1044,15 @@ class FilterUrls:
     
     
 
+    def filter_image_dict_2(self,image_urls_dict:list[dict]):
+        first_pass=[]
+        for image_dict in image_urls_dict:
+            url=image_dict["url"]
+            description=image_dict["description"]
+            sku=image_dict["sku"]
+            brand=image_dict["brand"]
 
+    
 
 
 
@@ -1678,3 +1687,4 @@ class FilterUrls:
 #                 product_details.append(product_detail)
 
 #         return product_details
+
