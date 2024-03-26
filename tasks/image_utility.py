@@ -333,22 +333,6 @@ class SearchEngine:
         return {'status': 404, 'body': "Failed after all attempts."}
 
 
-#     def get_google_image_nimble(self, query):
-#         #func_url = 'https://faas-nyc1-2ef2e6cc.doserverless.co/api/v1/web/fn-af66235d-5f26-40d2-8836-25a71fef3192/default/image-function-2'
-#         func_url = self.fetch_serverless_no_js_url(str(SERVERLESS_URL_SETTINGS))
-#         print(f"Current Url: {func_url}")
-#         headers = {
-#     'Content-Type': 'application/json',
-# }
-#         #payload = { 'api_key': 'ab75344fcf729c63c9665e8e8a21d985', 'url': url, 'country_code': 'us'}
-#     #    payload = { 'api_key': 'ab75344fcf729c63c9665e8e8a21d985', 'url': url}
-#         r = requests.get(f'{func_url}?query={query}', headers=headers,timeout=180)
-#         print(r.status_code)
-#         response_json = r.json()
-#         #print(response_json)
-#         #print(response_json)
-#         return {'status': r.status_code, 'body': self.unpack_content(response_json.get('body',None))}  
-
     def unpack_content(self,encoded_content):
         if encoded_content:
             compressed_content = base64.b64decode(encoded_content)
@@ -429,7 +413,9 @@ class SearchEngine:
     #             # If there is an index error, it means a description could not be found for the current thumbnail. So skip this thumbnail.
     #             continue    
     #     return final_full_res_images, final_descriptions,final_thumbnails   
+
     def get_original_images(self, html):
+
         matched_images_data = "".join(re.findall(r"AF_initDataCallback\(([^<]+)\);", str(html)))
 
         matched_images_data_fix = json.dumps(matched_images_data)
@@ -462,7 +448,6 @@ class SearchEngine:
         final_thumbnails = []
         final_full_res_images = []
         final_descriptions = []
-
         # Iterate over each thumbnail
         for i, thumbnail in enumerate(thumbnails):
             try:
@@ -473,6 +458,11 @@ class SearchEngine:
             except IndexError:
                 # If there is an index error, it means a description could not be found for the current thumbnail. So skip this thumbnail.
                 continue
+
+
+        print(f"Thumbs\n____________________________\n{final_thumbnails}\n-----------------------------------")
+        print(f"Full REs\n____________________________\n{final_full_res_images}\n-----------------------------------")
+        print(f"Final Desc\n____________________________\n{final_descriptions}\n-----------------------------------")
 
         return final_full_res_images, final_descriptions,final_thumbnails
 
@@ -1010,12 +1000,16 @@ class FilterUrls:
         second_pass=[]
         #for image_dict in first_pass:
         for image_dict in image_urls_dict:
-            url=image_dict["url"]
-            description=image_dict["description"]
-            sku=image_dict["sku"]
-            brand=image_dict["brand"]
-            if len(self.get_score_2(url, description, sku, brand, json_dict_2))>0:
-                second_pass.append(image_dict)
+            if image_dict:
+                url=image_dict["url"]
+                description=image_dict["description"]
+                sku=image_dict["sku"]
+                brand=image_dict["brand"]
+                if len(self.get_score_2(url, description, sku, brand, json_dict_2))>0:
+                    second_pass.append(image_dict)
+            else:
+                print('encountered none object in image_urls_dict')
+                print(image_urls_dict)
         if len(second_pass)==0:
             #return first_pass
             return 'None found in this filter'
@@ -1024,14 +1018,18 @@ class FilterUrls:
         
         #third_pass=[]
         for image_dict in second_pass:
-            url=image_dict["url"]
-            brand_domains=image_dict["brand_domains"]
-            final_score=self.get_score_3(url, brand_domains, json_dict_3)
-            if not final_score:
-                return second_pass[0]
-            if final_score>0:
-                third_pass.append(image_dict)
-                image_dict["score"]=final_score
+            if image_dict:
+                url=image_dict["url"]
+                brand_domains=image_dict["brand_domains"]
+                final_score=self.get_score_3(url, brand_domains, json_dict_3)
+                if not final_score:
+                    return second_pass[0]
+                if final_score>0:
+                    third_pass.append(image_dict)
+                    image_dict["score"]=final_score
+            else:
+                print('encountered none object in second_pass')
+                print(image_urls_dict)
         if len(third_pass)==0:
             return second_pass[0]
         highest_score=0
