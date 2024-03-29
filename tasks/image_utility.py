@@ -1,12 +1,44 @@
-import json,re,requests,logging
+import json,re,requests,logging,base64,random,time
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 from tasks.LR import LR
-
-import re
-
+import zlib
 from tasks.classes_and_utility import BrandSettings
-from settings import BRANDSETTINGSPATH
+from settings import BRANDSETTINGSPATH,SERVERLESS_URL_SETTINGS
+from html.parser import HTMLParser
+import html
+
+# Enhanced HTML Parser for extracting specific image data
+class EnhancedHTMLParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.items = []
+        self.current_item = {}
+        self.collecting_data = False
+
+    def handle_starttag(self, tag, attrs):
+        attrs_dict = dict(attrs)
+        if tag == 'td' and 'align' in attrs_dict and attrs_dict['align'] == 'center':
+            self.collecting_data = True
+            self.current_item = {'thumbnail_url': '', 'description': '', 'website': ''}
+        elif tag == 'img' and self.collecting_data:
+            self.current_item['thumbnail_url'] = attrs_dict.get('src', '')
+        elif tag == 'a' and self.collecting_data:
+            self.current_item['website'] = attrs_dict.get('href', '').split('?q=')[1].split('&')[0] if '?q=' in attrs_dict.get('href', '') else ''
+
+    def handle_data(self, data):
+        if self.collecting_data:
+            if 'description' not in self.current_item or not self.current_item['description']:
+                self.current_item['description'] = data
+
+    def handle_endtag(self, tag):
+        if tag == 'td' and self.collecting_data:
+            self.items.append(self.current_item)
+            self.collecting_data = False
+            self.current_item = {}
+
+    def error(self, message):
+        print(f"An error occurred: {message}")
 
 
 class SKUManager:
@@ -51,13 +83,13 @@ class SKUManager:
             if not char.isalnum():
                 non_alnum_indexes.append(i)
         return  non_alnum_indexes
-    # def handle_sku(self,sku,brand):
-    #     return [sku,str(sku) + ' ' + str(brand)]
     def handle_sku(self,sku,brand):
+         return [sku,str(sku) + ' ' + str(brand)]
+    def handle_sku_disabled(self,sku,brand):
         indices=self.get_indices(sku)
-        variations=[sku]
+        variations=[sku,str(sku)+' ' +str(brand)]
         if len(indices)>=4:
-            return None
+            return variations
         elif len(indices)==2:
             article=sku[:indices[0]]
             model=sku[indices[0]+1:indices[1]]
@@ -149,57 +181,242 @@ class SKUManager:
         cleaned = re.sub(r'[^a-zA-Z0-9]', '', sku)
         logging.info(f"Cleaned SKU: {cleaned}")
         return cleaned
-    
+
+
 class SearchEngine:
     def __init__(self,variation):
-        self.parsed_results = []
-        self.descriptions = []
+        ###place holder for html body
+        self.str_html_body = ""
         self.variation = variation
-        self.query_url = self.search_query(variation)
-        self.g_html_response = self.send_regular_request(self.query_url)
+        #!SCRAPER API DEPENDS ON search_query
+        #self.query_url = self.search_query(variation)
+        #self.g_html_response = self.send_regular_request_SCRAPERAPI(self.query_url)
+        #RETURNS HTML
+        self.g_html_response = self.get_google_image_nimble(self.variation)
+        print(f"Status Code : {self.g_html_response['status']}")
+        
         if self.g_html_response['status'] == 200:
-            self.parsed_results = self.parse_google_images(self.g_html_response['body'])
-            if "Looks like there aren’t any matches for your search" in self.parsed_results:
+            self.str_html_body = self.g_html_response['body']
+            #print(self.str_html_body)
+            if "Looks like there aren’t any matches for your search" in self.str_html_body:
                 print("NO PRODUCT FOUND")
                 return None               
 
-            elif "Looks like there aren’t any matches for your search" not in self.parsed_results:
-                hiQResponse = self.get_original_images(self.parsed_results)[0]
-                Descrip = self.get_original_images(self.parsed_results)[1]
+            elif "Looks like there aren’t any matches for your search" not in self.str_html_body:
+                print('Looking!')
+                hiQResponse = self.get_original_images(self.str_html_body)[0]
+                
+                Descrip = self.get_original_images(self.str_html_body)[1]
+
+                ##parser = EnhancedHTMLParser()
+
+                # Step 3: Feed the HTML Content to the Parser
+                ##parser.feed(self.str_html_body)
+
+                # Step 4: Access Extracted Items
+                ##for item in parser.items:
+                ##    print('----------------------')
+                ##    print(item)
+                ##    print('XXXXXXXXXXXXXXXXXXXXXX')
+                ##    self.parsed_results.append(item)
+##
+##
+                ##print('XXXXXXXXXXXXXXXXXXXXXX')
+                ##print(self.parsed_results)
+                ##print('+++++++++++++++++++++++++++++')
+
+
                 if hiQResponse:
                     self.parsed_results = hiQResponse
                     self.descriptions = Descrip
-                
-                               
+                    print(f"Parsed Url: {self.parsed_results}\nDescriptions: {self.descriptions}")
+
+                else:
+                    self.parsed_results = []
+                    self.descriptions = []
+                    print(f"Parsed Url: {self.parsed_results}\nDescriptions: {self.descriptions}")
+
+
+    def fetch_serverless_no_js_url(self,settings_url, max_retries=3):
+        retries = 0
+        while retries < max_retries:
+            try:
+                response = requests.get(settings_url, headers={'User-Agent': 'Mozilla/5.0'})
+                if response.status_code == 200:
+                    data = response.json()
+                    #nimble
+                    #serverless_urls = data.get("serverless-urls", {}).get("no_js", [])
+                    serverless_urls = data.get("serverless-urls", {}).get("noip_nojs", [])
+                    if serverless_urls:
+                        return serverless_urls
+                retries += 1
+                print(f"Retry {retries}/{max_retries} for fetching serverless URLs...")
+            except requests.RequestException as e:
+                print(f"Failed to fetch serverless URLs: {e}")
+                retries += 1
+        
+        print("Failed to fetch serverless URLs after maximum retries.")
+        return []
+
+
+
+
+    # def get_google_image_nimble(self, query):
+    #     serverless_urls = self.fetch_serverless_no_js_url(str(SERVERLESS_URL_SETTINGS))
+    #     if not serverless_urls:
+    #         return {'status': 404, 'body': "Failed to obtain serverless URLs."}
+        
+    #     attempt_delay = 1  # Start with a 1 second delay
+    #     max_attempts = 3
+    #     for attempt in range(max_attempts):
+    #         func_url = random.choice(serverless_urls)  # Select a URL at random
+    #         print(f"Attempt {attempt+1}: Current Url: {func_url}")
+    #         headers = {'Content-Type': 'application/json'}
+
+    #         try:
+    #             response = requests.get(f'{func_url}?query={query}', headers=headers, timeout=185)
+    #             if response.status_code == 200:
+    #                 response_json = response.json()
+    #                 result = response_json.get('body', None)
+    #                 if result:
+    #                     return {'status': response.status_code, 'body': self.unpack_content(result)}
+    #             else:
+    #                 print(f"Request failed with status code: {response.status_code}")
+    #         except requests.RequestException as e:
+    #             print(f"Error making request: {e}")
+
+    #         time.sleep(attempt_delay)  # Apply the delay
+    #         attempt_delay *= 2  # Exponentially increase the delay for the next attempt
+
+    #         # Remove the failed URL from the list to avoid retrying it
+    #         serverless_urls.remove(func_url)
+    #         if not serverless_urls:  # If we've exhausted all URLs
+    #             print("Exhausted all serverless URLs.")
+    #             break
+
+    #     return {'status': 404, 'body': "Failed after all attempts."}
+
+    def get_google_image_nimble(self, query):
+        serverless_urls = self.fetch_serverless_no_js_url(str(SERVERLESS_URL_SETTINGS))
+        if not serverless_urls:
+            return {'status': 404, 'body': "Failed to obtain serverless URLs."}
+        
+        last_used_url = None
+        attempt_delay = 1  # Start with a 1 second delay
+
+        for _ in range(len(serverless_urls) * 3):  # Total attempts: thrice the number of serverless URLs
+            # Select a random URL avoiding the last used one
+            current_urls = [url for url in serverless_urls if url != last_used_url]
+            func_url = random.choice(current_urls)
+
+            print(f"Using URL: {func_url}")
+            headers = {'Content-Type': 'application/json'}
+
+            try:
+                response = requests.get(f'{func_url}?query={query}', headers=headers, timeout=185)
+                if response.status_code == 200:
+                    response_json = response.json()
+                    result = response_json.get('body', None)
+                    if result:  # If result is not None, unpack and return
+                        return {'status': response.status_code, 'body': self.unpack_content(result)}
+                    # If result is None, proceed to retry with a different URL
+                else:
+                    print(f"Request failed with status code: {response.status_code}")
+            except requests.RequestException as e:
+                print(f"Error making request: {e}")
+
+            last_used_url = func_url  # Update last used URL
+            time.sleep(attempt_delay)  # Apply the delay
+            attempt_delay = min(attempt_delay * 2, 60)  # Exponentially increase the delay, up to a max of 60 seconds
+
+        # After trying all URLs without success
+        return {'status': 404, 'body': "Failed after all attempts."}
+
+
+    def unpack_content(self,encoded_content):
+        if encoded_content:
+            compressed_content = base64.b64decode(encoded_content)
+            original_content = zlib.decompress(compressed_content)
+            return str(original_content)  # Return as binary data
+        return None
+
+
      
-     
-    def send_regular_request(self, url):
+    def send_regular_request_SCRAPERAPI(self, url):
         payload = { 'api_key': 'ab75344fcf729c63c9665e8e8a21d985', 'url': url, 'country_code': 'us'}
     #    payload = { 'api_key': 'ab75344fcf729c63c9665e8e8a21d985', 'url': url}
         r = requests.get('https://api.scraperapi.com/', params=payload,timeout=120)
         return {'status': r.status_code, 'body': r.text}
-    #    
-    def search_query(self, sku):
+    #   
+    # 
+    #!SCRAPER API NEEDS THIS  
+    #def search_query(self, sku):
         #query = f"\"{sku}\""
         
-        return f"https://www.google.com/search?q={sku}&newwindow=1&tbm=isch&safe=active"
+        #return f"https://www.google.com/search?q={sku}&newwindow=1&tbm=isch&safe=active"
 
-    @staticmethod
-    def parse_google_images(html_content):
-        soup = BeautifulSoup(html_content, 'html.parser')
-        #  results = []
-        #  for g in soup.find_all('div', class_='g'):
-        #      links = g.find_all('a')
-        #      if links and 'href' in links[0].attrs:  # check if 'href' attribute exists
-        #          results.append(links[0]['href'])
-        return soup
+    # @staticmethod
+    # def parse_google_images(html_content):
+    #     soup = BeautifulSoup(html_content, 'html.parser')
+    #     #soup = BeautifulSoup(html_content, 'lxml')
+    #     #  results = []
+    #     #  for g in soup.find_all('div', class_='g'):
+    #     #      links = g.find_all('a')
+    #     #      if links and 'href' in links[0].attrs:  # check if 'href' attribute exists
+    #     #          results.append(links[0]['href'])
+    #     return soup
     
-    def get_original_images(self,soup):
+    # def get_original_images(self,html):
+    #     soup = BeautifulSoup(html, 'html.parser')
+    #     all_script_tags = soup.select("script") 
+    #     # Extract matched images data
+    #     matched_images_data = "".join(re.findall(r"AF_initDataCallback\(([^<]+)\);", str(all_script_tags)))
+    #     #matched_images_data = "".join(re.findall(r"AF_initDataCallback\(({key: 'ds:1'.*?)\);</script>", str(all_script_tags)))
+    #     print(matched_images_data)
+    #     matched_images_data_fix = json.dumps(matched_images_data)
+    #     print(matched_images_data)
+    #     matched_images_data_json = json.loads(matched_images_data_fix)
+    #     print(matched_images_data_json)
+    #     matched_google_image_data = re.findall(r'\"b-GRID_STATE0\"(.*)sideChannel:\s?{}}', matched_images_data_json)
+    #     print(matched_google_image_data)
+    #     # Extract thumbnails
+    #     matched_google_images_thumbnails = ", ".join(
+    #         re.findall(r'\[\"(https\:\/\/encrypted-tbn0\.gstatic\.com\/images\?.*?)\",\d+,\d+\]',
+    #                 str(matched_google_image_data))).split(", ")
+    #     print(matched_google_images_thumbnails)
+    #     thumbnails = [
+    #         bytes(bytes(thumbnail, "ascii").decode("unicode-escape"), "ascii").decode("unicode-escape") for thumbnail in matched_google_images_thumbnails
+    #     ]
+    #     ##########
+    #     print('thumbnails')
+    #     print(thumbnails)
+    #     removed_matched_google_images_thumbnails = re.sub(
+    #         r'\[\"(https\:\/\/encrypted-tbn0\.gstatic\.com\/images\?.*?)\",\d+,\d+\]', "", str(matched_google_image_data))  
+    #     # Extract full resolution images
+    #     matched_google_full_resolution_images = re.findall(r"(?:'|,),\[\"(https:|http.*?)\",\d+,\d+\]", removed_matched_google_images_thumbnails)   
+    #     full_res_images = [
+    #         bytes(bytes(img, "ascii").decode("unicode-escape"), "ascii").decode("unicode-escape") for img in matched_google_full_resolution_images
+    #     ]   
+    #     # Assume descriptions are extracted
+    #     descriptions = LR().get(soup, '"2008":[null,"', '"]}],null,') # Replace 'description_pattern' with your actual regex pattern for descriptions   
+    #     final_thumbnails = []
+    #     final_full_res_images = []
+    #     final_descriptions = [] 
+    #     # Iterate over each thumbnail
+    #     for i, thumbnail in enumerate(thumbnails):
+    #         try:
+    #             # If a full resolution image exists, add it. If not, add the thumbnail instead.
+    #             final_thumbnails.append(thumbnail)
+    #             final_full_res_images.append(full_res_images[i] if i < len(full_res_images) else thumbnail)
+    #             final_descriptions.append(descriptions[i])
+    #         except IndexError:
+    #             # If there is an index error, it means a description could not be found for the current thumbnail. So skip this thumbnail.
+    #             continue    
+    #     return final_full_res_images, final_descriptions,final_thumbnails   
 
-        all_script_tags = soup.select("script")
+    def get_original_images(self, html):
 
-        # Extract matched images data
-        matched_images_data = "".join(re.findall(r"AF_initDataCallback\(([^<]+)\);", str(all_script_tags)))
+        matched_images_data = "".join(re.findall(r"AF_initDataCallback\(([^<]+)\);", str(html)))
 
         matched_images_data_fix = json.dumps(matched_images_data)
         matched_images_data_json = json.loads(matched_images_data_fix)
@@ -214,7 +431,7 @@ class SearchEngine:
         thumbnails = [
             bytes(bytes(thumbnail, "ascii").decode("unicode-escape"), "ascii").decode("unicode-escape") for thumbnail in matched_google_images_thumbnails
         ]
-
+        
         removed_matched_google_images_thumbnails = re.sub(
             r'\[\"(https\:\/\/encrypted-tbn0\.gstatic\.com\/images\?.*?)\",\d+,\d+\]', "", str(matched_google_image_data))
 
@@ -226,12 +443,11 @@ class SearchEngine:
         ]
 
         # Assume descriptions are extracted
-        descriptions = LR().get(soup, '"2008":[null,"', '"]}],null,') # Replace 'description_pattern' with your actual regex pattern for descriptions
-
+        descriptions = LR().get(html, '"2008":[null,"', '"]}],null,') # Replace 'description_pattern' with your actual regex pattern for descriptions
+        #descriptions = []
         final_thumbnails = []
         final_full_res_images = []
         final_descriptions = []
-
         # Iterate over each thumbnail
         for i, thumbnail in enumerate(thumbnails):
             try:
@@ -243,9 +459,13 @@ class SearchEngine:
                 # If there is an index error, it means a description could not be found for the current thumbnail. So skip this thumbnail.
                 continue
 
+
+        print(f"Thumbs\n____________________________\n{final_thumbnails}\n-----------------------------------")
+        print(f"Full REs\n____________________________\n{final_full_res_images}\n-----------------------------------")
+        print(f"Final Desc\n____________________________\n{final_descriptions}\n-----------------------------------")
+
         return final_full_res_images, final_descriptions,final_thumbnails
-    
-    
+
 from urllib.parse import urlparse
 
 # class FilterUrls:
@@ -327,6 +547,7 @@ class FilterUrls:
         self.brand = brand.lower()
         self.sku = sku.lower()
         self.url_dicts_nodups = self.remove_dups(url_dicts)
+
         self.filtered_result = self.filter_image_dict(self.url_dicts_nodups)
         
         
@@ -517,9 +738,7 @@ class FilterUrls:
                 brand_names = self.remove_duplicates(brand_names)
                 print(f"This is the brand names {brand_names}")
             else:
-                brand_names = [brand]
-            #brand_names_unclean=["ysl", "yves saint laurent", "saint laurent", "saint-laurent"] # to be implemented returns all possible ways that the brand name may be in the url/description i.e YSL, Yves Saint Laurent, etc
-            
+                brand_names = [brand]           
             print(f"This is the brand names {brand_names}")
             possible_scores=[]
             print(f"This is the possible scores {possible_scores}")
@@ -757,7 +976,7 @@ class FilterUrls:
 
 
     def filter_image_dict(self,image_urls_dict:list[dict]):
-        json_url_1="https://raw.githubusercontent.com/nikiconluxury/images-filter/main/step_1_filter_images.json"
+        #json_url_1="https://raw.githubusercontent.com/nikiconluxury/images-filter/main/step_1_filter_images.json"
         json_url_2="https://raw.githubusercontent.com/nikiconluxury/images-filter/main/step_2_filter_images.json"
         json_url_3="https://raw.githubusercontent.com/nikiconluxury/images-filter/main/domain_point_values.json"
         #json_dict_1=self.fetch_json_from_url(json_url_1)
@@ -781,28 +1000,36 @@ class FilterUrls:
         second_pass=[]
         #for image_dict in first_pass:
         for image_dict in image_urls_dict:
-            url=image_dict["url"]
-            description=image_dict["description"]
-            sku=image_dict["sku"]
-            brand=image_dict["brand"]
-            if len(self.get_score_2(url, description, sku, brand, json_dict_2))>0:
-                second_pass.append(image_dict)
+            if image_dict:
+                url=image_dict["url"]
+                description=image_dict["description"]
+                sku=image_dict["sku"]
+                brand=image_dict["brand"]
+                if len(self.get_score_2(url, description, sku, brand, json_dict_2))>0:
+                    second_pass.append(image_dict)
+            else:
+                print('encountered none object in image_urls_dict')
+                print(image_urls_dict)
         if len(second_pass)==0:
             #return first_pass
             return 'None found in this filter'
         elif len(second_pass)==1:
             return second_pass[0]
         
-        third_pass=[]
+        #third_pass=[]
         for image_dict in second_pass:
-            url=image_dict["url"]
-            brand_domains=image_dict["brand_domains"]
-            final_score=self.get_score_3(url, brand_domains, json_dict_3)
-            if not final_score:
-                return second_pass[0]
-            if final_score>0:
-                third_pass.append(image_dict)
-                image_dict["score"]=final_score
+            if image_dict:
+                url=image_dict["url"]
+                brand_domains=image_dict["brand_domains"]
+                final_score=self.get_score_3(url, brand_domains, json_dict_3)
+                if not final_score:
+                    return second_pass[0]
+                if final_score>0:
+                    third_pass.append(image_dict)
+                    image_dict["score"]=final_score
+            else:
+                print('encountered none object in second_pass')
+                print(image_urls_dict)
         if len(third_pass)==0:
             return second_pass[0]
         highest_score=0
@@ -815,7 +1042,15 @@ class FilterUrls:
     
     
 
+    def filter_image_dict_2(self,image_urls_dict:list[dict]):
+        first_pass=[]
+        for image_dict in image_urls_dict:
+            url=image_dict["url"]
+            description=image_dict["description"]
+            sku=image_dict["sku"]
+            brand=image_dict["brand"]
 
+    
 
 
 
@@ -1450,3 +1685,4 @@ class FilterUrls:
 #                 product_details.append(product_detail)
 
 #         return product_details
+

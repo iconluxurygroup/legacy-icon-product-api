@@ -88,11 +88,13 @@ def get_brand_domains(brand):
  
     
 @shared_task
+### IF ZIP OR SEARCH IS LESS THAN MIGHT CAUSE ISSUES
 def process_item(item,brand):#get html and return list of parsed google urls
     processed_items = []
     search_engine = SearchEngine(item)
     urls = search_engine.parsed_results
     descriptions = search_engine.descriptions
+
     for url, description in zip(urls, descriptions):
         processed_items.append({
                 'url': url,
