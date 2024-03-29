@@ -7,7 +7,8 @@ from tasks.classes_and_utility import BrandSettings
 from settings import BRANDSETTINGSPATH,SERVERLESS_URL_SETTINGS
 from html.parser import HTMLParser
 import html
-
+import string
+from tasks.google_parser import get_original_images as GP
 # Enhanced HTML Parser for extracting specific image data
 class EnhancedHTMLParser(HTMLParser):
     def __init__(self):
@@ -188,43 +189,27 @@ class SearchEngine:
         ###place holder for html body
         self.str_html_body = ""
         self.variation = variation
-        #!SCRAPER API DEPENDS ON search_query
-        #self.query_url = self.search_query(variation)
-        #self.g_html_response = self.send_regular_request_SCRAPERAPI(self.query_url)
-        #RETURNS HTML
         self.g_html_response = self.get_google_image_nimble(self.variation)
         print(f"Status Code : {self.g_html_response['status']}")
         
         if self.g_html_response['status'] == 200:
             self.str_html_body = self.g_html_response['body']
-            #print(self.str_html_body)
             if "Looks like there aren’t any matches for your search" in self.str_html_body:
                 print("NO PRODUCT FOUND")
                 return None               
 
-            elif "Looks like there aren’t any matches for your search" not in self.str_html_body:
-                print('Looking!')
-                hiQResponse = self.get_original_images(self.str_html_body)[0]
+            # elif "Looks like there aren’t any matches for your search" not in self.str_html_body:
+            #     print('Looking!')
+
+            #     hiQResponse = self.get_original_images(self.str_html_body)[0]
                 
-                Descrip = self.get_original_images(self.str_html_body)[1]
+            #     Descrip = self.get_original_images(self.str_html_body)[1]
+            elif "Looks like there aren’t any matches for your search" not in self.str_html_body and '["GRID_STATE0"' in self.str_html_body:
+                print('Looking!')
 
-                ##parser = EnhancedHTMLParser()
-
-                # Step 3: Feed the HTML Content to the Parser
-                ##parser.feed(self.str_html_body)
-
-                # Step 4: Access Extracted Items
-                ##for item in parser.items:
-                ##    print('----------------------')
-                ##    print(item)
-                ##    print('XXXXXXXXXXXXXXXXXXXXXX')
-                ##    self.parsed_results.append(item)
-##
-##
-                ##print('XXXXXXXXXXXXXXXXXXXXXX')
-                ##print(self.parsed_results)
-                ##print('+++++++++++++++++++++++++++++')
-
+                hiQResponse = GP(self.str_html_body)[0]
+               
+                Descrip = GP(self.str_html_body)[1]
 
                 if hiQResponse:
                     self.parsed_results = hiQResponse
@@ -232,10 +217,42 @@ class SearchEngine:
                     print(f"Parsed Url: {self.parsed_results}\nDescriptions: {self.descriptions}")
 
                 else:
-                    self.parsed_results = []
-                    self.descriptions = []
-                    print(f"Parsed Url: {self.parsed_results}\nDescriptions: {self.descriptions}")
+                    print('no descriptions or urls')
+                #     self.parsed_results = []
+                #     self.descriptions = []
+                #     print(f"Parsed Url: {self.parsed_results}\nDescriptions: {self.descriptions}")
+            else:
+                print('trying again!!!!!!!!!!!!!!!!!!!!!!')
+                self.workflow_search(self.variation)
 
+
+    def workflow_search(self,variation):
+        self.g_html_response = self.get_google_image_nimble(self.variation)
+        print(f"Status Code : {self.g_html_response['status']}")
+        
+        if self.g_html_response['status'] == 200:
+            self.str_html_body = self.g_html_response['body']
+            if "Looks like there aren’t any matches for your search" in self.str_html_body:
+                print("NO PRODUCT FOUND")
+                return None               
+            elif "Looks like there aren’t any matches for your search" not in self.str_html_body and '["GRID_STATE0"' in self.str_html_body:
+                print('Looking!')
+
+                hiQResponse = GP(self.str_html_body)[0]
+               
+                Descrip = GP(self.str_html_body)[1]
+
+                if hiQResponse:
+                    self.parsed_results = hiQResponse
+                    self.descriptions = Descrip
+                    print(f"Parsed Url: {self.parsed_results}\nDescriptions: {self.descriptions}") 
+
+                else:
+                    return None
+            else:
+                print('trying again!!!!!!!')
+                self.workflow_search(self.variation)   
+            
 
     def fetch_serverless_no_js_url(self,settings_url, max_retries=3):
         retries = 0
@@ -414,57 +431,66 @@ class SearchEngine:
     #             continue    
     #     return final_full_res_images, final_descriptions,final_thumbnails   
 
-    def get_original_images(self, html):
+    # def get_original_images(self, html):
+    #     #rstring = self.generate_random_name()
+    #     print('---html start---')
+    #     print(html)
+    #     print('---html end---')
+    #     #filepath = str(rstring)+'.txt'
+    #     #with open(filepath, 'w') as file:
+    #         #file.write(str(html))
+    #     matched_images_data = "".join(re.findall(r"AF_initDataCallback\(([^<]+)\);", str(html)))
 
-        matched_images_data = "".join(re.findall(r"AF_initDataCallback\(([^<]+)\);", str(html)))
+    #     matched_images_data_fix = json.dumps(matched_images_data)
+    #     matched_images_data_json = json.loads(matched_images_data_fix)
 
-        matched_images_data_fix = json.dumps(matched_images_data)
-        matched_images_data_json = json.loads(matched_images_data_fix)
+    #     matched_google_image_data = re.findall(r'\"b-GRID_STATE0\"(.*)sideChannel:\s?{}}', matched_images_data_json)
 
-        matched_google_image_data = re.findall(r'\"b-GRID_STATE0\"(.*)sideChannel:\s?{}}', matched_images_data_json)
+    #     # Extract thumbnails
+    #     matched_google_images_thumbnails = ", ".join(
+    #         re.findall(r'\[\"(https\:\/\/encrypted-tbn0\.gstatic\.com\/images\?.*?)\",\d+,\d+\]',
+    #                 str(matched_google_image_data))).split(", ")
 
-        # Extract thumbnails
-        matched_google_images_thumbnails = ", ".join(
-            re.findall(r'\[\"(https\:\/\/encrypted-tbn0\.gstatic\.com\/images\?.*?)\",\d+,\d+\]',
-                    str(matched_google_image_data))).split(", ")
-
-        thumbnails = [
-            bytes(bytes(thumbnail, "ascii").decode("unicode-escape"), "ascii").decode("unicode-escape") for thumbnail in matched_google_images_thumbnails
-        ]
+    #     thumbnails = [
+    #         bytes(bytes(thumbnail, "ascii").decode("unicode-escape"), "ascii").decode("unicode-escape") for thumbnail in matched_google_images_thumbnails
+    #     ]
         
-        removed_matched_google_images_thumbnails = re.sub(
-            r'\[\"(https\:\/\/encrypted-tbn0\.gstatic\.com\/images\?.*?)\",\d+,\d+\]', "", str(matched_google_image_data))
+    #     removed_matched_google_images_thumbnails = re.sub(
+    #         r'\[\"(https\:\/\/encrypted-tbn0\.gstatic\.com\/images\?.*?)\",\d+,\d+\]', "", str(matched_google_image_data))
 
-        # Extract full resolution images
-        matched_google_full_resolution_images = re.findall(r"(?:'|,),\[\"(https:|http.*?)\",\d+,\d+\]", removed_matched_google_images_thumbnails)
+    #     # Extract full resolution images
+    #     matched_google_full_resolution_images = re.findall(r"(?:'|,),\[\"(https:|http.*?)\",\d+,\d+\]", removed_matched_google_images_thumbnails)
 
-        full_res_images = [
-            bytes(bytes(img, "ascii").decode("unicode-escape"), "ascii").decode("unicode-escape") for img in matched_google_full_resolution_images
-        ]
+    #     full_res_images = [
+    #         bytes(bytes(img, "ascii").decode("unicode-escape"), "ascii").decode("unicode-escape") for img in matched_google_full_resolution_images
+    #     ]
 
-        # Assume descriptions are extracted
-        descriptions = LR().get(html, '"2008":[null,"', '"]}],null,') # Replace 'description_pattern' with your actual regex pattern for descriptions
-        #descriptions = []
-        final_thumbnails = []
-        final_full_res_images = []
-        final_descriptions = []
-        # Iterate over each thumbnail
-        for i, thumbnail in enumerate(thumbnails):
-            try:
-                # If a full resolution image exists, add it. If not, add the thumbnail instead.
-                final_thumbnails.append(thumbnail)
-                final_full_res_images.append(full_res_images[i] if i < len(full_res_images) else thumbnail)
-                final_descriptions.append(descriptions[i])
-            except IndexError:
-                # If there is an index error, it means a description could not be found for the current thumbnail. So skip this thumbnail.
-                continue
+    #     # Assume descriptions are extracted
+    #     descriptions = LR().get(html, '"2008":[null,"', '"]}],null,') # Replace 'description_pattern' with your actual regex pattern for descriptions
+    #     #descriptions = []
+    #     final_thumbnails = []
+    #     final_full_res_images = []
+    #     final_descriptions = []
+    #     # Iterate over each thumbnail
+    #     for i, thumbnail in enumerate(thumbnails):
+    #         try:
+    #             # If a full resolution image exists, add it. If not, add the thumbnail instead.
+    #             final_thumbnails.append(thumbnail)
+    #             if i < len(full_res_images) and full_res_images[i] != '':
+    #                 final_full_res_images.append(full_res_images[i])
+    #             else:
+    #                 final_full_res_images.append(thumbnail)
+    #             final_descriptions.append(descriptions[i])
+    #         except IndexError:
+    #             # If there is an index error, it means a description could not be found for the current thumbnail. So skip this thumbnail.
+    #             continue
 
 
-        print(f"Thumbs\n____________________________\n{final_thumbnails}\n-----------------------------------")
-        print(f"Full REs\n____________________________\n{final_full_res_images}\n-----------------------------------")
-        print(f"Final Desc\n____________________________\n{final_descriptions}\n-----------------------------------")
+    #     print(f"Thumbs\n____________________________\n{final_thumbnails}\n-----------------------------------")
+    #     print(f"Full REs\n____________________________\n{final_full_res_images}\n-----------------------------------")
+    #     print(f"Final Desc\n____________________________\n{final_descriptions}\n-----------------------------------")
 
-        return final_full_res_images, final_descriptions,final_thumbnails
+    #     return final_full_res_images, final_descriptions,final_thumbnails
 
 from urllib.parse import urlparse
 

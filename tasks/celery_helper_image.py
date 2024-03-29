@@ -94,7 +94,14 @@ def process_item(item,brand):#get html and return list of parsed google urls
     search_engine = SearchEngine(item)
     urls = search_engine.parsed_results
     descriptions = search_engine.descriptions
+    # Check if either urls or descriptions list is empty
+    if not urls or not descriptions:
+        raise ValueError("Either 'urls' or 'descriptions' list is empty.")
 
+    # Check if urls and descriptions lists are of unequal lengths
+    if len(urls) != len(descriptions):
+        
+        raise ValueError(f"'urls'{len(urls)} and 'descriptions' {len(descriptions)}lists are of unequal lengths.\n{urls}-----\n{descriptions}")
     for url, description in zip(urls, descriptions):
         processed_items.append({
                 'url': url,
