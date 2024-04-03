@@ -3,7 +3,7 @@ from typing import Dict
 from celery import chord,shared_task
 from celery.result import AsyncResult
 from celery_worker import celery_app
-from tasks.image_utility import SKUManager,SearchEngine,FilterUrls
+from tasks.image_utility import SKUManager,SearchEngine,FilterUrls,SearchEngineV2
 from tasks.classes_and_utility import BrandSettings
 from settings import BRANDSETTINGSPATH
 
@@ -91,86 +91,35 @@ def get_brand_domains(brand):
 ### IF ZIP OR SEARCH IS LESS THAN MIGHT CAUSE ISSUES
 def process_item(item,brand):#get html and return list of parsed google urls
     processed_items = []
-    search_engine = SearchEngine(item)
-    urls = search_engine.parsed_results
-    descriptions = search_engine.descriptions
-    # Check if either urls or descriptions list is empty
-    if not urls or not descriptions:
-        raise ValueError("Either 'urls' or 'descriptions' list is empty.")
+    search_engine = SearchEngineV2()
+    results = search_engine.get_results(item)
+    if results:
+    #urls = search_engine.urls_list
+    #descriptions = search_engine.descriptions_list
+        urls = results[0]
+        descriptions = results[1]
+        #        
+        # Check if either urls or descriptions list is empty
+        if not urls or not descriptions:
+            raise ValueError("Either 'urls' or 'descriptions' list is empty.")
 
-    # Check if urls and descriptions lists are of unequal lengths
-    if len(urls) != len(descriptions):
-        
-        raise ValueError(f"'urls'{len(urls)} and 'descriptions' {len(descriptions)}lists are of unequal lengths.\n{urls}-----\n{descriptions}")
-    for url, description in zip(urls, descriptions):
-        processed_items.append({
-                'url': url,
-                'description': description,
-                'sku': item,
-                'brand': brand,
-                'brand_domains':get_brand_domains(brand)
-            })
-    return processed_items
-
-# def filter_results(url_list_with_items, brand,sku):
-#     if url_list_with_items is None:
-#         url_list_with_items = []
-#     filtered_url_list_with_info = []
-
-#     # Create a mapping from URL to its corresponding dictionary
-#     url_to_original_dict = {url_dict['url']: url_dict for url_dict in url_list_with_items}
-    
-#     # Extract URLs and apply filtering
-#     urls = [url_dict['url'] for url_dict in url_list_with_items]
-    
-#     filtered_urls = FilterUrls(urls, brand,sku).filtered_urls
-
-#     print(filtered_urls,"------------------------------------------")
-#     # Ensure filtered_urls is iterable
-#     if not filtered_urls:
-#         filtered_urls = []
-#         return None
-#     if filtered_urls:    
-#         # Include only the filtered URLs, their corresponding original dictionary, and type
-#         for filtered_url_info in filtered_urls:
-#             print(filtered_url_info, "------------------------------------------")
-#             filtered_url = filtered_url_info[0] # Assuming the URL is the first element in the list
-#             url_type = filtered_url_info[1] # Extract type from the second element in the list
+        # Check if urls and descriptions lists are of unequal lengths
+        if len(urls) != len(descriptions):
             
-#             if filtered_url in url_to_original_dict:
-#                 original_dict = url_to_original_dict[filtered_url]
-#                 # Update the original dictionary with the type
-#                 original_dict.update({'type': url_type})
-#                 filtered_url_list_with_info.append(original_dict)
+            raise ValueError(f"'urls'{len(urls)} and 'descriptions' {len(descriptions)}lists are of unequal lengths.\n{urls}-----\n{descriptions}")
+        for url, description in zip(urls, descriptions):
+            processed_items.append({
+                    'url': url,
+                    'description': description,
+                    'sku': item,
+                    'brand': brand,
+                    'brand_domains':get_brand_domains(brand)
+                })
+        return processed_items
+    else:
+        return process_item(item,brand)
 
-#                 return filtered_url_list_with_info
-# @shared_task
-# def filter_results(url_list_with_items, brand, sku):
-#     if not url_list_with_items:
-#         return []
 
-#     # Create a mapping from URL to its corresponding dictionary
-#     url_to_original_dict = {url_dict['url']: url_dict for url_dict in url_list_with_items}
-
-#     # Extract URLs and apply filtering
-#     urls = [url_dict['url'] for url_dict in url_list_with_items]
-
-#     filtered_urls = FilterUrls(urls, brand, sku).filtered_urls
-
-#     filtered_url_list_with_info = []
-
-#     # Ensure filtered_urls is iterable and not empty
-#     if not filtered_urls:
-#         return []
-
-#     # Include only the filtered URLs, their corresponding original dictionary
-#     for filtered_url in filtered_urls:
-#         if filtered_url in url_to_original_dict:
-#             original_dict = url_to_original_dict[filtered_url]
-#             filtered_url_list_with_info.append(original_dict)
-
-#     return filtered_url_list_with_info
-    
 @shared_task
 def filter_results(url_list_with_items, brand, sku):
     if not url_list_with_items:
