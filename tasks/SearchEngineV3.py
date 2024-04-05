@@ -1,10 +1,10 @@
 import mysql.connector
 import unicodedata,requests, random, time, base64, zlib
 from tasks.google_parser import get_original_images as GP
+
 HOST_V = 'db-mysql-nyc3-32053-do-user-15526822-0.c.db.ondigitalocean.com'
 DB_V =  'defaultdb'
 USER_V = 'doadmin'
-PASS_V = 'AVNS_DpjC8ACPq4bOcL3TuDl'
 PORT_V = 25060
 class SearchEngineV3:
     def __init__(self):
@@ -15,7 +15,7 @@ class SearchEngineV3:
     'host': HOST_V,
     'database': DB_V,
     'user': USER_V,
-    'passwd': PASS_V,
+    'passwd': 'AVNS_DpjC8ACPq4bOcL3TuDl',
     'port': PORT_V,
 }
         self.endpoint = self.get_endpoint_mysql()
