@@ -6,7 +6,7 @@ from celery_worker import celery_app
 from tasks.image_utility import SKUManager,SearchEngine,FilterUrls,SearchEngineV2
 from tasks.classes_and_utility import BrandSettings
 from settings import BRANDSETTINGSPATH
-
+from tasks.SearchEngineV3 import SearchEngineV3
 def fetch_task_result_image(task_id: str) -> dict:
     """
     Fetches the result of a Celery task by its ID. If the task is part of a workflow with subtasks,
@@ -85,8 +85,38 @@ def process_group_results(results):
 def get_brand_domains(brand):
     brand_settings = BrandSettings(json.loads(open(BRANDSETTINGSPATH,encoding='utf-8').read())).get_brand_img_domains(brand)
     return brand_settings
- 
-    
+
+@shared_task
+def process_itemV2(item, brand):  # get html and return list of parsed google urls
+    processed_items = []
+    search_engine = SearchEngineV3()
+    search_engine.get_results(item)
+
+    if search_engine.image_url_list and search_engine.image_desc_list and search_engine.image_source_list:
+        image_url_list = search_engine.image_url_list
+        image_desc_list = search_engine.image_desc_list
+        image_source_list = search_engine.image_source_list
+
+        # Check if either urls or descriptions list is empty
+        if not image_url_list or not image_desc_list or not image_source_list:
+            raise ValueError("Either 'urls' or 'descriptions' list is empty. or source is empty")
+
+        # Check if urls and descriptions lists are of unequal lengths
+        if len(image_url_list) != len(image_desc_list):
+            raise ValueError(
+                f"'urls'{len(image_url_list)} and 'descriptions' {len(image_desc_list)}lists are of unequal lengths.\n{urls}-----\n{descriptions}")
+        for url, description in zip(image_url_list, image_desc_list):
+            processed_items.append({
+                'url': url,
+                'description': description,
+                'sku': item,
+                'brand': brand,
+                'brand_domains': get_brand_domains(brand)
+            })
+        return processed_items
+    else:
+        print('endless lop')
+        return process_itemV2(item, brand)   
 @shared_task
 ### IF ZIP OR SEARCH IS LESS THAN MIGHT CAUSE ISSUES
 def process_item(item,brand):#get html and return list of parsed google urls

@@ -1,184 +1,152 @@
+import re,chardet
 from tasks.LR import LR
-import re, ast
 
-# Start and end tags used in HTML processing
-line_start_tag = '[[{"444383007":[1,[0,'
-line_end_tag = ']}]]'
 
-def d_instance(input_string, delimiter=",", instance=8):
-    """
-    This function processes a string representation of a list by splitting it at a specified delimiter
-    and truncates it after a given instance, then returns the modified list as a string.
-
-    :param input_string: String representation of the list to process.
-    :param delimiter: Delimiter for splitting the string. Defaults to ",".
-    :param instance: Instance after which the list is cut off. Defaults to 6.
-    :return: Modified string representation of the list.
-    """
-    # Split the input string and truncate it after the specified instance
-    split_list = input_string.split(delimiter)
-    cut_off_list = split_list[:instance] if len(split_list) > instance else split_list
-
-    # Reassemble the truncated list into a string
-    result_string = delimiter.join(cut_off_list)
-
-    # Attempt to correct improper string endings
+def get_original_images(html_bytes):
     try:
-        eval(result_string)
-    except SyntaxError:
-        result_string = fix_string_by_replacing_quotes(result_string)
+        detected_encoding = chardet.detect(html_bytes)['encoding']
+        soup = html_bytes.decode(detected_encoding)
+    except Exception as e:
+        print(e)
+        soup = html_bytes.decode('utf-8')
 
-    return result_string
+    #print(f"type: { type(soup)}")
 
-def decode_html_content(html):
-    """
-    Decodes HTML content, handling both byte sequences and strings with possible encoding issues.
+    start_tag = 'FINANCE",[22,1]]]]]'
+    end_tag = ':[null,null,null,1,['
+    # with open('text.html', 'w', encoding='utf-8') as file:
+    #      file.write(soup)
+    matched_google_image_data = LR().get(soup, start_tag, end_tag)
+    if 'Error' in matched_google_image_data:
+        return None
+    if not matched_google_image_data:
+        print('No matched_google_image_data')
+        return (['No start_tag or end_tag'],['No start_tag or end_tag'],['No start_tag or end_tag'])
+    matched_google_image_data = str(matched_google_image_data).replace('\u003d','=')
+    matched_google_image_data = str(matched_google_image_data).replace('\u0026', '&')
 
-    :param html: HTML content to decode.
-    :return: Decoded HTML content as a string.
-    """
-    if isinstance(html, bytes):
-        # Decode byte sequences, with a fallback to ISO-8859-1 for common web encoding issues
-        try:
-            return html.decode('utf-8')
-        except UnicodeDecodeError:
-            return html.decode('iso-8859-1')
-    elif isinstance(html, str):
-                # Handle strings with encoded byte sequences
-        try:
-            html_as_bytes = bytes(html, "utf-8").decode("unicode_escape").encode("latin1")
-            return html_as_bytes.decode("utf-8")
-        except:
-            return html  # Return the original string if decoding fails
-        else:
-            raise ValueError("Unsupported type for HTML content.")
+    print(matched_google_image_data)
+    print(type(matched_google_image_data))
 
-def fix_string_by_replacing_quotes(input_string):
-    """
-    Replaces escaped double quotes with single quotes in a string.
+    # thumbnails = [
+    #     bytes(bytes(thumbnail, 'utf-8').decode("unicode-escape"), "utf-8").decode("unicode-escape") for thumbnail in
+    #     matched_google_image_data
+    # ]
+    # print(thumbnails)
+    thumbnails = matched_google_image_data
+    if '"2003":' not in thumbnails:
+        print('No 2003 tag found')
+        return (['No google image results found'],['No google image results found'],['No google image results found'])
+    # matched_google_images_thumbnails = ", ".join(
+    #     re.findall(r'\[\"(https\:\/\/encrypted-tbn0\.gstatic\.com\/images\?.*?)\",\d+,\d+\]',
+    #                str(thumbnails))).split(", ")
 
-    :param input_string: The string to process.
-    :return: The string with escaped double quotes replaced.
-    """
-    return input_string.replace('\\"', "'")
-def trim_lists_to_same_length(*lists):
-    """
-    Trims given lists so they all have the same length, by removing elements
-    from the end of longer lists. If no lists are given or if all lists are
-    already of the same length, no trimming is done.
-    
-    Parameters:
-    - lists: Variable number of list arguments
-    
-    Returns:
-    - A tuple of lists, all trimmed to the same length.
-    """
-    
-    if not lists:
-        return tuple()
-    
-    # Find the minimum length among all lists
-    min_length = min(len(lst) for lst in lists)
-    
-    # Trim lists to the minimum length by slicing
-    trimmed_lists = [lst[:min_length] for lst in lists]
-    
-    return tuple(trimmed_lists)
-def get_original_images(html):
-    #print(html)
-    image_links_list = []
-    descrip_list = []
+    regex_pattern_desc = r'"2003":\[null,"[^"]*","[^"]*","(.*?)"'
+    # print(matched_google_images_thumbnails)
+    matched_description = re.findall(regex_pattern_desc, str(thumbnails))
 
-    html = decode_html_content(html)
-    grid = LR().get(html, '["GRID_STATE0"', 'stopScanForCss')
-    if grid:
-        print("Get Grid!")
-    # Pattern to match text within specified start and end tags
-    pattern = re.escape(line_start_tag) + '(.*?)' + re.escape(line_end_tag)
-    matches = re.findall(pattern, str(grid), re.DOTALL)
-    if not matches:
-        return False
-    print(len(matches))
-    for match in matches:
-        list_img, list_desc = extract_image_and_description(match)
-        image_links_list.append(list_img[0])
-        # Check if list_desc is an instance of list
-        if isinstance(list_desc, list):
-            # Check if index 3 exists in the list
-            if len(list_desc) > 3:
-                # Take the element at index 3 and append it
-                descrip_list.append(list_desc[3])
-            else:
-                # If index 3 doesn't exist, just append the whole list (if this is your intended behavior)
-                print(f"Debug: {list_desc}")
-                #raise
-                #descrip_list.extend(list_desc)
-        else:
-            # If list_desc is not a list, print it for debugging
-            print(f"Debug Not Exist: {list_desc}")
-    print(f"{len(image_links_list)}\n{len(descrip_list)}")
+    regex_pattern_src = r'"2003":\[null,"[^"]*","(.*?)"'
+    matched_source = re.findall(regex_pattern_src, str(thumbnails))
+    #print(matched_source)
+    removed_matched_google_images_thumbnails = re.sub(
+        r'\[\"(https\:\/\/encrypted-tbn0\.gstatic\.com\/images\?.*?)\",\d+,\d+\]', "", str(thumbnails))
 
+    # Extract full resolution images
+    matched_google_full_resolution_images = re.findall(r"(?:|,),\[\"(https:|http.*?)\",\d+,\d+\]",
+                                                       removed_matched_google_images_thumbnails)
 
+    #print(len(matched_description))
 
-    image_links_list,descrip_list = trim_lists_to_same_length(image_links_list,descrip_list)
-    if not image_links_list or not descrip_list:
-        print(f"Either 'urls' or 'descriptions' list is empty.\n{image_links_list}\n{descrip_list}\n")
-    return image_links_list,descrip_list
+    full_res_images = [
+        bytes(bytes(img, "utf-8").decode("unicode-escape"), "utf-8").decode("unicode-escape") for img in
+        matched_google_full_resolution_images
+    ]
+    cleaned_urls = [clean_image_url(url) for url in full_res_images]
+    cleaned_source = [clean_source_url(url) for url in matched_source]
 
-def extract_image_and_description(match):
-    """
-    Extracts image URLs and descriptions from a match string.
+    # print(len(cleaned_descriptions))
+    # print(matched_description)
+    # Assume descriptions are extracted
+    # descriptions = LR().get(soup, '"2008":[null,"', '"]}],null,') # Replace 'description_pattern' with your actual regex pattern for descriptions
 
-    :param match: The matched string containing image and description data.
-    :return: A tuple containing the list of image URLs and the list of descriptions.
-    """
-    list_pattern = r"(\[.*?\])"
-    list_matches = re.findall(list_pattern, str(match))
+    final_thumbnails = []
+    final_full_res_images = []
+    final_descriptions = []
+    print(type(matched_description))
+    print('made it')
+    if len(cleaned_urls) >= 10:
+        print('made it above 10')
+        final_image_urls = cleaned_urls[:10]
+        final_descriptions = matched_description[:10]
+        final_source_url = cleaned_source[:10]
+        return final_image_urls, final_descriptions, final_source_url
+    else:
+        print('made it below 10')
+        min_length = min(len(cleaned_urls), len(matched_description), len(cleaned_source))
 
-    # Process image URL and description lists
+        print(f"{min_length}\nImg Urls: {len(cleaned_urls)}\nDescriptions: {len(matched_description)}\nSource Urls: {len(cleaned_source)}")
+        final_image_urls = cleaned_urls[:min_length]
+        final_descriptions = matched_description[:min_length]
+        final_source_url = cleaned_source[:min_length]
+        print(f"{min_length}\nImg Urls New: {len(final_image_urls)}\nDescriptions New: {len(final_descriptions)}\nSource Urls New: {len(final_source_url)}")
+        return final_image_urls, final_descriptions,final_source_url
+def clean_source_url(s):
+    # First, remove '\\\\' to simplify handling
+    simplified_str = s.replace('\\\\', '')
 
-    try:
-        list_img = ast.literal_eval(list_matches[1])
-    except SyntaxError:
-        if list_matches[1].count('"') % 2 != 0:  # Odd number of double quotes
-            print()
-            list_matches[1] += '"'  # Attempt to close the string
-        elif list_matches[1].count("'") % 2 != 0:  # Odd number of single quotes
-            list_matches[1] += "'"  # Attempt to close the string
-        list_img = ast.literal_eval(list_matches[1])
-    #except Exception as e:
-        #print(e)
-        #raise 
-        
-    print(f"Debug : {list_matches[3]}\n\n-----\n{list_matches}")
-    list_desc = process_description(list_matches[3])
-    if not list_img or not list_desc:
-        print(f"Either 'urls' or 'descriptions' list is empty.\n{list_img}\n{list_matches}")
-    return list_img, list_desc
+    # Mapping of encoded sequences to their decoded characters
+    replacements = {
+        'u0026': '&',
+        'u003d': '=',
+        'u003f': '?',
+        'u0020': ' ',
+        'u0025': '%',
+        'u002b': '+',
+        'u003c': '<',
+        'u003e': '>',
+        'u0023': '#',
+        'u0024': '$',
+        'u002f': '/',
+        'u005c': '\\',
+        'u007c': '|',
+        'u002d': '-',
+        'u003a': ':',
+        'u003b': ';',
+        'u002c': ',',
+        'u002e': '.',
+        'u0021': '!',
+        'u0040': '@',
+        'u005e': '^',
+        'u0060': '`',
+        'u007b': '{',
+        'u007d': '}',
+        'u005b': '[',
+        'u005d': ']',
+        'u002a': '*',
+        'u0028': '(',
+        'u0029': ')'
+    }
 
-def process_description(description):
-    """
-    Processes a string containing image descriptions to correct format errors and convert to a list.
+    # Apply the replacements
+    for encoded, decoded in replacements.items():
+        simplified_str = simplified_str.replace(encoded, decoded)
 
-    :param description: String containing the image descriptions.
-    :return: Processed list of descriptions.
-    """
-    description = description.replace(',{"26":[null,2]',']')
-    description = description.replace('null','"None"').replace(',true',',"True"').replace('false','"False"')
+    return simplified_str
+def clean_image_url(url):
+    # Pattern matches common image file extensions followed by a question mark and any characters after it
+    pattern = re.compile(r'(.*\.(?:png|jpg|jpeg|gif))(?:\?.*)?', re.IGNORECASE)
 
-    try:
-        list_elements = ast.literal_eval(description)
-    except SyntaxError:
-    # Check if the description ends with a double quote
-        print(f"DESCRIPTION: {description}")
-        description = str(d_instance(description)) 
-        if description.endswith('"'):
-            description += ']'
-        else:
-            description += '"]'
-        print(f"DESCRIPTION: {description}")
-        list_elements = ast.literal_eval(description)
-        print("----------------------------\n")
-        print(list_elements)
-    return list_elements
+    # Search for matches in the input URL
+    match = pattern.match(url)
 
+    # If a match is found, return the part of the URL before the query parameters (group 1)
+    if match:
+        return match.group(1)
+
+    # If no match is found, return the original URL
+    return url
+
+# with open("text.html", "r", encoding='utf-8') as f:
+#     html_content = f.read()
+#     results = get_original_images(html_content)
+#     print(results)

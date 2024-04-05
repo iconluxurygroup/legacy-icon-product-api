@@ -8,8 +8,9 @@ from settings import BRANDSETTINGSPATH,SERVERLESS_URL_SETTINGS
 from html.parser import HTMLParser
 import html
 import string
-from tasks.google_p import get_original_images as GP
 import unicodedata
+from tasks.google_parser import get_original_images as GP
+
 # Enhanced HTML Parser for extracting specific image data
 class EnhancedHTMLParser(HTMLParser):
     def __init__(self):
@@ -494,62 +495,7 @@ class SearchEngine:
 
     #     return final_full_res_images, final_descriptions,final_thumbnails
 
-from urllib.parse import urlparse
 
-# class FilterUrls:
-#     def __init__(self, list_url, brand, sku):
-#         self.whitelisted_domains = [
-#             "fwrd.com",
-#             "modesens.com",
-#             "saksfifthavenue.com",
-#             "saksoff5th.com",
-#             "nordstrom.com",
-#             "nordstromrack.com",
-#             "giglio.com",
-#             "italist.com",
-#             "farfetch.com",
-#             "mytheresa.com",
-#             "neimanmarcus.com",
-#             "jomashop.com",
-#         ]
-#         self.brand = brand.lower()  # Ensure brand is lowercase for comparison
-#         self.sku = sku.lower()  # Ensure SKU is lowercase for comparison
-#         self.url_list_nodups = self.remove_duplicates(list_url)
-#         self.filtered_urls = self.filter_urls(self.url_list_nodups)
-
-#     def filter_urls(self, urls):
-#         brand_urls = []
-#         whitelist_urls = []
-#         sku_urls = []
-
-#         for url in urls:
-#             url = url.strip()
-#             if not url.startswith(('http://', 'https://')):
-#                 url = 'http://' + url
-
-#             domain = urlparse(url).netloc.lower()
-#             if domain.startswith('www.'):
-#                 domain = domain[4:]
-
-#             # Check if URL contains the brand or SKU
-#             if self.brand in url.lower():
-#                 brand_urls.append(url)
-#             elif self.sku in url.lower():
-#                 sku_urls.append(url)
-#             elif domain in [domain.replace('www.', '') for domain in self.whitelisted_domains]:
-#                 whitelist_urls.append(url)
-
-#         # Combine the lists in the specified order
-#         return brand_urls + whitelist_urls + sku_urls
-
-#     def remove_duplicates(self, input_list):
-#         seen = set()
-#         result = []
-#         for item in input_list:
-#             if item not in seen:
-#                 seen.add(item)
-#                 result.append(item)
-#         return result
 from urllib.parse import urlparse
 from itertools import product
 class FilterUrls:
@@ -1170,6 +1116,7 @@ class FilterUrls:
                 new_list.append(url_dict)
         return new_list
 class SearchEngineV2:
+
 
     def get_results(self, variation):
         self.workflow_results = self.search_workflow(variation)
