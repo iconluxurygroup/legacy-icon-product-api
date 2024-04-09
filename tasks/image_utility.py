@@ -10,7 +10,6 @@ import html
 import string
 import unicodedata
 from tasks.google_parser import get_original_images as GP
-import mysql.connector
 # Enhanced HTML Parser for extracting specific image data
 class EnhancedHTMLParser(HTMLParser):
     def __init__(self):
@@ -928,7 +927,7 @@ class FilterUrls:
         else:
             # Return an empty list when possible_amc is empty or None
             return []
-        return possible_scores
+
 
 
 
@@ -987,7 +986,7 @@ class FilterUrls:
             else:
                 print('encountered none object in image_urls_dict')
                 print(image_urls_dict)
-        if len(second_pass)==0:
+        if len(second_pass)==0 or None:
             #return first_pass
             return 'None found in this filter'
         elif len(second_pass)>=1:
