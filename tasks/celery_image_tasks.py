@@ -8,7 +8,7 @@ import mysql.connector.pooling
 
 global_connection_pool = mysql.connector.pooling.MySQLConnectionPool(
     pool_name="mypool",
-    pool_size=2,
+    pool_size=32,
     host=HOST_V,
     database=DB_V,
     user=USER_V,
