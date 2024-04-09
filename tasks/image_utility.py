@@ -10,7 +10,7 @@ import html
 import string
 import unicodedata
 from tasks.google_parser import get_original_images as GP
-
+import mysql.connector
 # Enhanced HTML Parser for extracting specific image data
 class EnhancedHTMLParser(HTMLParser):
     def __init__(self):

@@ -137,7 +137,10 @@ def process_item(item,brand):#get html and return list of parsed google urls
         if len(urls) != len(descriptions):
             
             raise ValueError(f"'urls'{len(urls)} and 'descriptions' {len(descriptions)}lists are of unequal lengths.\n{urls}-----\n{descriptions}")
+
+
         for url, description in zip(urls, descriptions):
+            values = url,description,None
             processed_items.append({
                     'url': url,
                     'description': description,
@@ -145,22 +148,44 @@ def process_item(item,brand):#get html and return list of parsed google urls
                     'brand': brand,
                     'brand_domains':get_brand_domains(brand)
                 })
+
         return processed_items
     else:
         return process_item(item,brand)
 
-
+import mysql.connector
 @shared_task
-def filter_results(url_list_with_items, brand, sku):
+def write_results_to_mysql(result,entry_id,file_id,conn_params):
+    print(result)
+    print('writing to db')
+    image_url = result.get('url')
+    image_desc = result.get('description')
+    image_source = result.get('source')
+    print(image_url)
+    query = f"Update utb_ImageScraperResult set ImageURL = '{image_url}', ImageDesc = '{image_desc}', ImageSource = '{image_source}', CompleteTime = current_timestamp Where EntryID = {entry_id} and FileID = '{file_id}'"
+    connection = mysql.connector.connect(**conn_params)
+    cursor = connection.cursor()
+    print(query)
+    cursor.execute(str(query))
+    connection.commit()
+    cursor.close()
+    connection.close()
+@shared_task
+def filter_results(url_list_with_items, brand, sku,entry_id,file_id,conn_params):
+    print(entry_id,file_id)
     if not url_list_with_items:
         return []# Return immediately if no URLs are provided????????????????????????______________________________
 
     filter_urls_instance = FilterUrls(url_list_with_items, brand, sku)
     filter_results = filter_urls_instance.filtered_result
     if (type(filter_results) == list) and (len(filter_results) > 1):
+        print('im in!')
+        write_results_to_mysql(filter_results[0], entry_id, file_id, conn_params)
         return filter_results[0]
     else:
+        write_results_to_mysql(filter_results, entry_id, file_id, conn_params)
         return filter_results
+    ###WRITE TO DBBB
 # @shared_task
 # def combine_results(results_with_items):
 #     print(results_with_items)
@@ -186,7 +211,6 @@ def combine_results(results_with_items):
 #     l_product_detail = {'url': classified_url['url'],'type' : classified_url['type'],'brand':brand_name,'variation':classified_url['variation'], 'details': parsed_data}
 #     return l_product_detail
 
-from collections import Counter
 
 from collections import Counter
 
