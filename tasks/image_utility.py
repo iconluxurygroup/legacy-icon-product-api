@@ -755,7 +755,7 @@ class FilterUrls:
                     print(f"This score: {current_score} came from this dict {amc_dict}")
                 #print(f"These are all the possible scores {possible_scores}")
                 #filtered_scores = [score for score in possible_scores if score >= threshold]
-                return filtered_scores
+                # return filtered_scores
 
                 
                 
@@ -893,7 +893,7 @@ class FilterUrls:
                     # If both article and model are present, award points for them
                     if article_present and model_present:
                         current_score += article_model_score_value
-                        print(f"article and model are present {value}")
+                        #print(f"article and model are present {value}")
                         # Check for color only if article and model are present
                         color_value = self.clean_string(amc_dict.get("color", ""))
                         if color_value and (color_value in url or color_value in description):
@@ -987,31 +987,31 @@ class FilterUrls:
         if len(second_pass)==0:
             #return first_pass
             return 'None found in this filter'
-        elif len(second_pass)==1:
+        elif len(second_pass)>=1:
             return second_pass[0]
         
-        #third_pass=[]
-        for image_dict in second_pass:
-            if image_dict:
-                url=image_dict["url"]
-                brand_domains=image_dict["brand_domains"]
-                final_score=self.get_score_3(url, brand_domains, json_dict_3)
-                if not final_score:
-                    return second_pass[0]
-                if final_score>0:
-                    third_pass.append(image_dict)
-                    image_dict["score"]=final_score
-            else:
-                print('encountered none object in second_pass')
-                print(image_urls_dict)
-        if len(third_pass)==0:
-            return second_pass[0]
-        highest_score=0
-        for index,image_dict in enumerate(third_pass):
-            if image_dict["score"]>highest_score:
-                highest_score=image_dict["score"]
-                final_index=index
-        return third_pass[final_index]
+        # #third_pass=[]
+        # for image_dict in second_pass:
+        #     if image_dict:
+        #         url=image_dict["url"]
+        #         brand_domains=image_dict["brand_domains"]
+        #         final_score=self.get_score_3(url, brand_domains, json_dict_3)
+        #         if not final_score:
+        #             return second_pass[0]
+        #         if final_score>0:
+        #             third_pass.append(image_dict)
+        #             image_dict["score"]=final_score
+        #     else:
+        #         print('encountered none object in second_pass')
+        #         print(image_urls_dict)
+        # # if len(third_pass)==0:
+        # #     return second_pass[0]
+        # # highest_score=0
+        # # for index,image_dict in enumerate(third_pass):
+        # #     if image_dict["score"]>highest_score:
+        # #         highest_score=image_dict["score"]
+        # #         final_index=index
+        # # return third_pass[final_index]
 
     
     
