@@ -88,10 +88,13 @@ def write_results_to_mysql(result, entry_id, file_id):
     global global_connection_pool
     print(result)
     print('Writing to db')
-
-    image_url = result.get('url')
-    image_desc = result.get('description')
-    image_source = result.get('source')
+    image_url = 'None found in this filter'
+    image_desc = 'None found in this filter'
+    image_source = 'None'
+    if result != 'None found in this filter':
+        image_url = result.get('url')
+        image_desc = result.get('description')
+        image_source = result.get('source')
 
     query = "UPDATE utb_ImageScraperResult SET ImageURL = %s, ImageDesc = %s, ImageSource = %s, CompleteTime = CURRENT_TIMESTAMP WHERE EntryID = %s AND FileID = %s"
     query_params = (image_url, image_desc, image_source, entry_id, file_id)
