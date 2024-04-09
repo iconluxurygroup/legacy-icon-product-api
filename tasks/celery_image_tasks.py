@@ -75,6 +75,8 @@ def filter_results(url_list_with_items, brand, sku, entry_id, file_id):
 
     filter_urls_instance = FilterUrls(url_list_with_items, brand, sku)
     filter_results = filter_urls_instance.filtered_result
+    if not filter_results:
+        return []
     if (type(filter_results) == list) and (len(filter_results) > 1):
         print('im in!')
         write_results_to_mysql(filter_results[0], entry_id, file_id)
