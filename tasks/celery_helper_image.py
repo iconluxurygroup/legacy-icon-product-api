@@ -106,8 +106,13 @@ def process_itemV2(item, brand):  # get html and return list of parsed google ur
 
         # Check if urls and descriptions lists are of unequal lengths
         if len(image_url_list) != len(image_desc_list):
-            raise ValueError(
-                f"'urls'{len(image_url_list)} and 'descriptions' {len(image_desc_list)}lists are of unequal lengths.")
+            # Determine the minimum length
+            min_length = min(len(image_url_list), len(image_desc_list))
+
+            # Truncate the lists to the minimum length
+            image_url_list = image_url_list[:min_length]
+            image_desc_list = image_desc_list[:min_length]
+
         for url, description in zip(image_url_list, image_desc_list):
             processed_items.append({
                 'url': url,
