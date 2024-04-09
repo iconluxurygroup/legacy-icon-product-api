@@ -7,6 +7,9 @@ from tasks.image_utility import SKUManager,SearchEngine,FilterUrls,SearchEngineV
 from tasks.classes_and_utility import BrandSettings
 from settings import BRANDSETTINGSPATH
 from tasks.SearchEngineV3 import SearchEngineV3
+import mysql.connector
+from mysql.connector import pooling
+
 def fetch_task_result_image(task_id: str) -> dict:
     """
     Fetches the result of a Celery task by its ID. If the task is part of a workflow with subtasks,
@@ -104,7 +107,7 @@ def process_itemV2(item, brand):  # get html and return list of parsed google ur
         # Check if urls and descriptions lists are of unequal lengths
         if len(image_url_list) != len(image_desc_list):
             raise ValueError(
-                f"'urls'{len(image_url_list)} and 'descriptions' {len(image_desc_list)}lists are of unequal lengths.\n{urls}-----\n{descriptions}")
+                f"'urls'{len(image_url_list)} and 'descriptions' {len(image_desc_list)}lists are of unequal lengths.")
         for url, description in zip(image_url_list, image_desc_list):
             processed_items.append({
                 'url': url,
@@ -152,24 +155,34 @@ def process_item(item,brand):#get html and return list of parsed google urls
         return processed_items
     else:
         return process_item(item,brand)
+def initialize_connection_pool(conn_params):
+    """
+    Initializes and returns a connection pool.
+    """
+    pool = pooling.MySQLConnectionPool(pool_name="mypool1",
+                                       pool_size=10,  # Adjust the pool size according to your application's needs
+                                       **conn_params)
+    return pool
 
-import mysql.connector
-@shared_task
-def write_results_to_mysql(result,entry_id,file_id,conn_params):
+def write_results_to_mysql(result, entry_id, file_id, conn_params):
+
+    connection_pool = initialize_connection_pool(conn_params)
     print(result)
-    print('writing to db')
+    print('Writing to db')
     image_url = result.get('url')
     image_desc = result.get('description')
     image_source = result.get('source')
-    print(image_url)
-    query = f"Update utb_ImageScraperResult set ImageURL = '{image_url}', ImageDesc = '{image_desc}', ImageSource = '{image_source}', CompleteTime = current_timestamp Where EntryID = {entry_id} and FileID = '{file_id}'"
-    connection = mysql.connector.connect(**conn_params)
+
+    query = "UPDATE utb_ImageScraperResult SET ImageURL = %s, ImageDesc = %s, ImageSource = %s, CompleteTime = CURRENT_TIMESTAMP WHERE EntryID = %s AND FileID = %s"
+    query_params = (image_url, image_desc, image_source, entry_id, file_id)
+
+    connection = connection_pool.get_connection()
     cursor = connection.cursor()
-    print(query)
-    cursor.execute(str(query))
+    cursor.execute(query, query_params)
     connection.commit()
     cursor.close()
     connection.close()
+    print(f"Data written to DB for EntryID: {entry_id} and FileID: {file_id}")
 @shared_task
 def filter_results(url_list_with_items, brand, sku,entry_id,file_id,conn_params):
     print(entry_id,file_id)

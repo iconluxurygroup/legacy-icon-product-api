@@ -4,7 +4,6 @@ from tasks.celery_helper_image import initial_task,process_item, filter_results,
 from settings import HOST_V,DB_V,USER_V,PASS_V,PORT_V
 
 
-
 @celery_app.task(name='create_task_image')
 def create_task_image(data):
     print(data)
@@ -14,6 +13,7 @@ def create_task_image(data):
     file_id = data[3]
     task_id = execute_workflow(brand,sku,entry_id,file_id)
     return task_id
+
 
 
 def execute_workflow(brand, sku,entry_id,file_id):
