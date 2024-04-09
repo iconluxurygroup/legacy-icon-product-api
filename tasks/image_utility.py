@@ -121,7 +121,7 @@ class SKUManager:
     #     for i in range(sku_len):
     #         if not sku[i].isalnum():
     #             if not sku[i] in temp_dict:
-    #                 temp_dict[sku[i]]=1
+    #                 temp_dict[sku[i]]=1FilterUrls
     #             else:
     #                 temp_dict[sku[i]]+=1
         
@@ -925,7 +925,10 @@ class FilterUrls:
                         filtered_scores = filtered_scores.sort(reverse=True)
                         print(filtered_scores, '----- filtered scores')
                         return filtered_scores
-                    
+        else:
+            # Return an empty list when possible_amc is empty or None
+            return []
+        return possible_scores
 
 
 
