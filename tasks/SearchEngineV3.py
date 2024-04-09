@@ -1,21 +1,22 @@
-import mysql.connector
 import unicodedata,requests, random, time, base64, zlib
 from tasks.google_parser import get_original_images as GP
 from settings import HOST_V,DB_V,USER_V,PASS_V,PORT_V
 
 class SearchEngineV3:
-    def __init__(self):
+    def __init__(self, connection_pool):
         self.image_url_list = None
         self.image_desc_list = None
         self.image_source_list = None
         self.conn_params = {
-    'host': HOST_V,
-    'database': DB_V,
-    'user': USER_V,
-    'passwd': PASS_V,
-    'port': PORT_V,
-}
+            'host': HOST_V,
+            'database': DB_V,
+            'user': USER_V,
+            'passwd': PASS_V,
+            'port': PORT_V,
+        }
+        self.connection_pool = connection_pool
         self.endpoint = self.get_endpoint_mysql()
+
 
     def get_results(self, variation):
         workflow_results = self.search_row(variation, self.endpoint)
@@ -76,17 +77,37 @@ class SearchEngineV3:
             print(f"Error making request: {e}\nTrying Again: {n_endpoint}")
             return self.search_row(search_string, n_endpoint)
 
+    # def get_endpoint_mysql(self):
+    #     connection = mysql.connector.connect(**self.conn_params)
+    #     cursor = connection.cursor()
+    #
+    #     # Adjusted SQL query for MySQL. Note: The ORDER BY RAND() is less performant on large datasets.
+    #     sql_query = "SELECT EndpointURL FROM utb_Endpoints WHERE EndpointIsBlocked = 0 ORDER BY RAND() LIMIT 1"
+    #
+    #     cursor.execute(sql_query)
+    #     endpoint_url = cursor.fetchone()
+    #
+    #     # No need to commit after a SELECT statement, so it's removed.
+    #     cursor.close()
+    #     connection.close()
+    #
+    #     if endpoint_url:
+    #         (endpoint,) = endpoint_url
+    #         print(endpoint)
+    #     else:
+    #         print("No EndpointURL")
+    #         endpoint = "No EndpointURL"
+    #
+    #     return endpoint
     def get_endpoint_mysql(self):
-        connection = mysql.connector.connect(**self.conn_params)
+        connection = self.connection_pool.get_connection()
         cursor = connection.cursor()
 
-        # Adjusted SQL query for MySQL. Note: The ORDER BY RAND() is less performant on large datasets.
         sql_query = "SELECT EndpointURL FROM utb_Endpoints WHERE EndpointIsBlocked = 0 ORDER BY RAND() LIMIT 1"
 
         cursor.execute(sql_query)
         endpoint_url = cursor.fetchone()
 
-        # No need to commit after a SELECT statement, so it's removed.
         cursor.close()
         connection.close()
 
@@ -98,16 +119,26 @@ class SearchEngineV3:
             endpoint = "No EndpointURL"
 
         return endpoint
+    # def remove_endpoint_mysql(self,endpoint):
+    #     # conn_params is a dictionary containing MySQL connection parameters such as
+    #     # host, database, user, and password.
+    #     connection = mysql.connector.connect(**self.conn_params)
+    #     cursor = connection.cursor()
+    #     # Using parameterized queries to prevent SQL injection
+    #     sql_query = "UPDATE utb_Endpoints SET EndpointIsBlocked = 1 WHERE EndpointURL = %s"
+    #     cursor.execute(sql_query, (endpoint,))
+    #     connection.commit()
+    #     cursor.close()
+    #     connection.close()
 
-    def remove_endpoint_mysql(self,endpoint):
-        # conn_params is a dictionary containing MySQL connection parameters such as
-        # host, database, user, and password.
-        connection = mysql.connector.connect(**self.conn_params)
+    def remove_endpoint_mysql(self, endpoint):
+        connection = self.connection_pool.get_connection()
         cursor = connection.cursor()
-        # Using parameterized queries to prevent SQL injection
+
         sql_query = "UPDATE utb_Endpoints SET EndpointIsBlocked = 1 WHERE EndpointURL = %s"
         cursor.execute(sql_query, (endpoint,))
         connection.commit()
+
         cursor.close()
         connection.close()
 

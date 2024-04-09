@@ -7,8 +7,8 @@ from tasks.image_utility import SKUManager,SearchEngine,FilterUrls,SearchEngineV
 from tasks.classes_and_utility import BrandSettings
 from settings import BRANDSETTINGSPATH
 from tasks.SearchEngineV3 import SearchEngineV3
-import mysql.connector
-from mysql.connector import pooling
+
+
 
 def fetch_task_result_image(task_id: str) -> dict:
     """
@@ -90,9 +90,9 @@ def get_brand_domains(brand):
     return brand_settings
 
 @shared_task
-def process_itemV2(item, brand):  # get html and return list of parsed google urls
+def process_itemV2(item, brand,connection_pool):  # get html and return list of parsed google urls
     processed_items = []
-    search_engine = SearchEngineV3()
+    search_engine = SearchEngineV3(connection_pool)
     search_engine.get_results(item)
 
     if search_engine.image_url_list and search_engine.image_desc_list and search_engine.image_source_list:
@@ -124,7 +124,7 @@ def process_itemV2(item, brand):  # get html and return list of parsed google ur
         return processed_items
     else:
         print('endless lop')
-        return process_itemV2(item, brand)   
+        return process_itemV2(item, brand,connection_pool)
 @shared_task
 ### IF ZIP OR SEARCH IS LESS THAN MIGHT CAUSE ISSUES
 def process_item(item,brand):#get html and return list of parsed google urls
@@ -160,20 +160,28 @@ def process_item(item,brand):#get html and return list of parsed google urls
         return processed_items
     else:
         return process_item(item,brand)
-def initialize_connection_pool(conn_params):
-    """
-    Initializes and returns a connection pool.
-    """
-    pool = pooling.MySQLConnectionPool(pool_name="mypool1",
-                                       pool_size=10,  # Adjust the pool size according to your application's needs
-                                       **conn_params)
-    return pool
 
-def write_results_to_mysql(result, entry_id, file_id, conn_params):
-
-    connection_pool = initialize_connection_pool(conn_params)
+# def write_results_to_mysql(result, entry_id, file_id, connection_pool):
+#     print(result)
+#     print('Writing to db')
+#     image_url = result.get('url')
+#     image_desc = result.get('description')
+#     image_source = result.get('source')
+#
+#     query = "UPDATE utb_ImageScraperResult SET ImageURL = %s, ImageDesc = %s, ImageSource = %s, CompleteTime = CURRENT_TIMESTAMP WHERE EntryID = %s AND FileID = %s"
+#     query_params = (image_url, image_desc, image_source, entry_id, file_id)
+#
+#     connection = connection_pool.get_connection()
+#     cursor = connection.cursor()
+#     cursor.execute(query, query_params)
+#     connection.commit()
+#     cursor.close()
+#     connection.close()
+#     print(f"Data written to DB for EntryID: {entry_id} and FileID: {file_id}")
+def write_results_to_mysql(result, entry_id, file_id, connection_pool):
     print(result)
     print('Writing to db')
+
     image_url = result.get('url')
     image_desc = result.get('description')
     image_source = result.get('source')
@@ -183,13 +191,31 @@ def write_results_to_mysql(result, entry_id, file_id, conn_params):
 
     connection = connection_pool.get_connection()
     cursor = connection.cursor()
+
     cursor.execute(query, query_params)
     connection.commit()
+
     cursor.close()
     connection.close()
+
     print(f"Data written to DB for EntryID: {entry_id} and FileID: {file_id}")
+# @shared_task
+# def filter_results(url_list_with_items, brand, sku,entry_id,file_id,conn_params):
+#     print(entry_id,file_id)
+#     if not url_list_with_items:
+#         return []# Return immediately if no URLs are provided????????????????????????______________________________
+#
+#     filter_urls_instance = FilterUrls(url_list_with_items, brand, sku)
+#     filter_results = filter_urls_instance.filtered_result
+#     if (type(filter_results) == list) and (len(filter_results) > 1):
+#         print('im in!')
+#         write_results_to_mysql(filter_results[0], entry_id, file_id, conn_params)
+#         return filter_results[0]
+#     else:
+#         write_results_to_mysql(filter_results, entry_id, file_id, conn_params)
+#         return filter_results
 @shared_task
-def filter_results(url_list_with_items, brand, sku,entry_id,file_id,conn_params):
+def filter_results(url_list_with_items, brand, sku, entry_id, file_id, connection_pool):
     print(entry_id,file_id)
     if not url_list_with_items:
         return []# Return immediately if no URLs are provided????????????????????????______________________________
@@ -198,10 +224,10 @@ def filter_results(url_list_with_items, brand, sku,entry_id,file_id,conn_params)
     filter_results = filter_urls_instance.filtered_result
     if (type(filter_results) == list) and (len(filter_results) > 1):
         print('im in!')
-        write_results_to_mysql(filter_results[0], entry_id, file_id, conn_params)
+        write_results_to_mysql(fifilter_results[0], entry_id, file_id, connection_pool)
         return filter_results[0]
     else:
-        write_results_to_mysql(filter_results, entry_id, file_id, conn_params)
+        write_results_to_mysql(filter_results, entry_id, file_id, connection_pool)
         return filter_results
     ###WRITE TO DBBB
 # @shared_task
