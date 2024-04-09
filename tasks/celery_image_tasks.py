@@ -1,7 +1,8 @@
 # tasks/celery_tasks.py
 import requests, base64, zlib
 from celery import shared_task
-from tasks.image_utility import SKUManager,FilterUrls
+from tasks.image_utility import SKUManager
+from tasks.FilterImageV2 import FilterUrlsV2
 from tasks.google_parser import get_original_images as GP
 from settings import HOST_V,DB_V,USER_V,PASS_V,PORT_V
 import mysql.connector.pooling
@@ -73,9 +74,10 @@ def filter_results(url_list_with_items, brand, sku, entry_id, file_id):
     if not url_list_with_items:
         return []# Return immediately if no URLs are provided????????????????????????______________________________
 
-    filter_urls_instance = FilterUrls(url_list_with_items, brand, sku)
+    filter_urls_instance = FilterUrlsV2(url_list_with_items, brand, sku)
     filter_results = filter_urls_instance.filtered_result
     if not filter_results:
+        print('no result returned from filterImage')
         return []
     if (type(filter_results) == list) and (len(filter_results) > 1):
         print('im in!')
