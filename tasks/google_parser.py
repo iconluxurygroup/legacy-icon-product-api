@@ -37,9 +37,9 @@ def get_original_images(html_bytes):
     if '"2003":' not in thumbnails:
         print('No 2003 tag found')
         return (['No google image results found'],['No google image results found'],['No google image results found'])
-    # matched_google_images_thumbnails = ", ".join(
-    #     re.findall(r'\[\"(https\:\/\/encrypted-tbn0\.gstatic\.com\/images\?.*?)\",\d+,\d+\]',
-    #                str(thumbnails))).split(", ")
+    matched_google_images_thumbnails = ", ".join(
+         re.findall(r'\[\"(https\:\/\/encrypted-tbn0\.gstatic\.com\/images\?.*?)\",\d+,\d+\]',
+                    str(thumbnails))).split(", ")
 
     regex_pattern_desc = r'"2003":\[null,"[^"]*","[^"]*","(.*?)"'
     # print(matched_google_images_thumbnails)
@@ -85,11 +85,16 @@ def get_original_images(html_bytes):
         min_length = min(len(cleaned_urls), len(matched_description), len(cleaned_source))
 
         print(f"{min_length}\nImg Urls: {len(cleaned_urls)}\nDescriptions: {len(matched_description)}\nSource Urls: {len(cleaned_source)}")
-        final_image_urls = cleaned_urls[:min_length]
-        final_descriptions = matched_description[:min_length]
-        final_source_url = cleaned_source[:min_length]
-        print(f"{min_length}\nImg Urls New: {len(final_image_urls)}\nDescriptions New: {len(final_descriptions)}\nSource Urls New: {len(final_source_url)}")
-        return final_image_urls, final_descriptions,final_source_url
+
+        if min_length != 0:
+            final_image_urls = cleaned_urls[:min_length]
+            final_descriptions = matched_description[:min_length]
+            final_source_url = cleaned_source[:min_length]
+            print(f"{min_length}\nImg Urls New: {len(final_image_urls)}\nDescriptions New: {len(final_descriptions)}\nSource Urls New: {len(final_source_url)}")
+            return final_image_urls, final_descriptions,final_source_url
+        else:
+            return cleaned_urls[:1], ['No descriptions'], ['No source']
+
 def clean_source_url(s):
     # First, remove '\\\\' to simplify handling
     simplified_str = s.replace('\\\\', '')

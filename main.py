@@ -72,7 +72,7 @@ async def poll_task(task_id: str):
     elif result['status'] == 'Completed':
         return {'status': 'Completed', 'result': result['result']}
     else:
-        raise HTTPException(status_code=500, detail="Unexpected task status")    
+        raise HTTPException(status_code=500, detail="Unexpected task status")
     
     
 app.include_router(sample_router, prefix="/api/v1/sample")

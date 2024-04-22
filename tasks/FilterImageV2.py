@@ -29,6 +29,7 @@ class FilterUrlsV2:
         cleaned = ' '.join(cleaned.split())
         # Convert to lowercase and strip whitespace from the ends
         cleaned = cleaned.lower().strip()
+        cleaned = cleaned.replace(" ", "")
         return cleaned
 
     def fetch_json_from_url(self, url):
@@ -102,6 +103,7 @@ class FilterUrlsV2:
             return max(second_pass, key=lambda x: x['score'])
     def get_score_2(self, url, description, sku, brand, point_dict):
         # Segment the SKU into possible article, model, and color combinations
+        sku = sku.replace(brand,"")
         possible_amc = self.segment_workflow(sku, brand)
 
         # If no possible combinations found, return False
@@ -117,13 +119,14 @@ class FilterUrlsV2:
         color_score_value = point_dict.get("color", 0)
         brand_score_value = point_dict.get("brand", 0)
         threshold = point_dict.get("threshold", 0)
-
+        print(f"Article Model Score Value: {article_model_score_value}, Color Score Value: {color_score_value}, Brand Score Value: {brand_score_value}, Threshold: {threshold}")
         # Clean the URL and description strings
         url = self.clean_string(url)
         description = self.clean_string(description)
 
         fullsku = possible_amc[0].get('full_sku', None)
         if fullsku:
+            print(f'Using Full Sku {fullsku} Brand {brand_names}')
             for amc_dict in possible_amc:
                 current_score = 0
                 for value in amc_dict.values():
@@ -137,6 +140,8 @@ class FilterUrlsV2:
                         current_score += 1
                 for brand in brand_names:
                     brand = self.clean_string(brand)
+                    print(brand)
+                    print(f"Url: {url} Description {description}")
                     if brand in url:
                         print(f"Got a point for {brand}")
                         current_score += brand_score_value
@@ -145,6 +150,7 @@ class FilterUrlsV2:
                         current_score += brand_score_value
 
                 if current_score >= threshold:
+                    print(f'Using Full Sku {fullsku} Brand {brand_names} Current Score {current_score}')
                     return current_score
         else:
             for amc_dict in possible_amc:

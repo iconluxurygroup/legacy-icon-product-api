@@ -33,7 +33,7 @@ def combine_results(results_with_items):
     return aggregate_result
 
 @shared_task
-def process_itemV2(item, brand):  # get html and return list of parsed google urls
+def process_itemV2(item, brand,entry_id,file_id):  # get html and return list of parsed google urls
     processed_items = []
     search_engine = SearchEngineV3()
     search_engine.get_results(item)
@@ -64,28 +64,39 @@ def process_itemV2(item, brand):  # get html and return list of parsed google ur
                 'brand': brand,
                 'brand_domains': [] #get_brand_domains(brand)
             })
+
+
+        write_results_to_mysql(processed_items[0], entry_id, file_id)
         return processed_items
     else:
         print('endless lop')
         return process_itemV2(item, brand)
-@shared_task
-def filter_results(url_list_with_items, brand, sku, entry_id, file_id):
-    print(entry_id,file_id)
-    if not url_list_with_items:
-        return []# Return immediately if no URLs are provided????????????????????????______________________________
+# @shared_task
+# def filter_results(url_list_with_items, brand, sku, entry_id, file_id):
+#     print(entry_id,file_id)
+#     if not url_list_with_items:
+#         return []# Return immediately if no URLs are provided????????????????????????______________________________
+#
+#     filter_urls_instance = FilterUrlsV2(url_list_with_items, brand, sku)
+#     filter_results = filter_urls_instance.filtered_result
+#     if not filter_results:
+#         print('no result returned from filterImage')
+#         return []
+#     if (type(filter_results) == list) and (len(filter_results) > 1):
+#         print('im in!')
+#         write_results_to_mysql(filter_results[0], entry_id, file_id)
+#         return filter_results[0]
+#     else:
+#         write_results_to_mysql(filter_results, entry_id, file_id)
+#         return filter_results
 
-    filter_urls_instance = FilterUrlsV2(url_list_with_items, brand, sku)
-    filter_results = filter_urls_instance.filtered_result
-    if not filter_results:
-        print('no result returned from filterImage')
-        return []
-    if (type(filter_results) == list) and (len(filter_results) > 1):
-        print('im in!')
-        write_results_to_mysql(filter_results[0], entry_id, file_id)
-        return filter_results[0]
-    else:
-        write_results_to_mysql(filter_results, entry_id, file_id)
-        return filter_results
+# @shared_task
+# def filter_results(url_list_with_items, brand, sku, entry_id, file_id):
+#     print(entry_id,file_id)
+#     if not url_list_with_items:
+#         return []# Return immediately if no URLs are provided????????????????????????______________________________
+#
+#     return url_list_with_items[0]
 def write_results_to_mysql(result, entry_id, file_id):
     global global_connection_pool
     print(result)
@@ -160,26 +171,37 @@ class SearchEngineV3:
                         self.remove_endpoint_mysql(endpoint)
                         n_endpoint = self.get_endpoint_mysql()
                         return self.search_row(search_string, n_endpoint)  # Add return here
-                    if parsed_data[0][0] == 'No start_tag or end_tag':
-                        print('trying again 3')
-                        self.remove_endpoint_mysql(endpoint)
-                        n_endpoint = self.get_endpoint_mysql()
-                        return self.search_row(search_string, n_endpoint)
-                    else:
-                        print('parsed data!')
-                        image_url = parsed_data[0]
-                        image_desc = parsed_data[1]
-                        image_source = parsed_data[2]
-
-                        print(
-                            f'Image URL: {type(image_url)} {image_url}\nImage Desc:  {type(image_desc)} {image_desc}\nImage Source:{type(image_source)}  {image_source}')
-                        if image_url and image_desc and image_source:
-                            return image_url, image_desc, image_source
-                        else:
-                            print('trying again 4')
+                    if parsed_data[0]:
+                        print('data found')
+                        if parsed_data[0][0] == 'No start_tag or end_tag':
+                            print('trying again 3')
                             self.remove_endpoint_mysql(endpoint)
                             n_endpoint = self.get_endpoint_mysql()
                             return self.search_row(search_string, n_endpoint)
+                        else:
+                            print('parsed data!')
+                            image_url = parsed_data[0]
+                            image_desc = parsed_data[1]
+                            image_source = parsed_data[2]
+
+                            print(
+                                f'Image URL: {type(image_url)} {image_url}\nImage Desc:  {type(image_desc)} {image_desc}\nImage Source:{type(image_source)}  {image_source}')
+                            if image_url and image_desc and image_source:
+                                return image_url, image_desc, image_source
+                            else:
+                                #### only for todd snyder fix
+                                if image_url[0]:
+                                    return [image_url[0]], ['NO DESCRIPTION'], ['NO SOURCE']
+                                print('trying again 4')
+                                self.remove_endpoint_mysql(endpoint)
+                                n_endpoint = self.get_endpoint_mysql()
+                                return self.search_row(search_string, n_endpoint)
+                    else:
+                        print('trying again no data')
+                        self.remove_endpoint_mysql(endpoint)
+                        n_endpoint = self.get_endpoint_mysql()
+                        return self.search_row(search_string, n_endpoint)
+
         except requests.RequestException as e:
             print('trying again 5')
             self.remove_endpoint_mysql(endpoint)
