@@ -160,26 +160,37 @@ class SearchEngineV3:
                         self.remove_endpoint_mysql(endpoint)
                         n_endpoint = self.get_endpoint_mysql()
                         return self.search_row(search_string, n_endpoint)  # Add return here
-                    if parsed_data[0][0] == 'No start_tag or end_tag':
-                        print('trying again 3')
-                        self.remove_endpoint_mysql(endpoint)
-                        n_endpoint = self.get_endpoint_mysql()
-                        return self.search_row(search_string, n_endpoint)
-                    else:
-                        print('parsed data!')
-                        image_url = parsed_data[0]
-                        image_desc = parsed_data[1]
-                        image_source = parsed_data[2]
-
-                        print(
-                            f'Image URL: {type(image_url)} {image_url}\nImage Desc:  {type(image_desc)} {image_desc}\nImage Source:{type(image_source)}  {image_source}')
-                        if image_url and image_desc and image_source:
-                            return image_url, image_desc, image_source
-                        else:
-                            print('trying again 4')
+                    if parsed_data[0]:
+                        print('data found')
+                        if parsed_data[0][0] == 'No start_tag or end_tag':
+                            print('trying again 3')
                             self.remove_endpoint_mysql(endpoint)
                             n_endpoint = self.get_endpoint_mysql()
                             return self.search_row(search_string, n_endpoint)
+                        else:
+                            print('parsed data!')
+                            image_url = parsed_data[0]
+                            image_desc = parsed_data[1]
+                            image_source = parsed_data[2]
+
+                            print(
+                                f'Image URL: {type(image_url)} {image_url}\nImage Desc:  {type(image_desc)} {image_desc}\nImage Source:{type(image_source)}  {image_source}')
+                            if image_url and image_desc and image_source:
+                                return image_url, image_desc, image_source
+                            else:
+                                #### only for todd snyder fix
+                                if image_url[0]:
+                                    return [image_url[0]], ['NO DESCRIPTION'], ['NO SOURCE']
+                                print('trying again 4')
+                                self.remove_endpoint_mysql(endpoint)
+                                n_endpoint = self.get_endpoint_mysql()
+                                return self.search_row(search_string, n_endpoint)
+                    else:
+                        print('trying again no data')
+                        self.remove_endpoint_mysql(endpoint)
+                        n_endpoint = self.get_endpoint_mysql()
+                        return self.search_row(search_string, n_endpoint)
+
         except requests.RequestException as e:
             print('trying again 5')
             self.remove_endpoint_mysql(endpoint)
