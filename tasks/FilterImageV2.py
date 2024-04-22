@@ -29,6 +29,7 @@ class FilterUrlsV2:
         cleaned = ' '.join(cleaned.split())
         # Convert to lowercase and strip whitespace from the ends
         cleaned = cleaned.lower().strip()
+        cleaned = cleaned.replace(" ", "")
         return cleaned
 
     def fetch_json_from_url(self, url):
