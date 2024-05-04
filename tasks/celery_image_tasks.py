@@ -147,7 +147,7 @@ def filter_results(url_list_with_items, brand, sku, entry_id, file_id):
 #     print(f"Data written to DB for EntryID: {entry_id} and FileID: {file_id}")
 def write_results_to_mysql(image_url_list, entry_id, file_id):
     """
-    Updates the database record with multiple image URLs and the current timestamp.
+    Inserts multiple image URLs into the database with the current timestamp for the specified entry_id and file_id.
 
     Parameters:
     image_url_list (list of str): List of image URLs.
@@ -159,12 +159,11 @@ def write_results_to_mysql(image_url_list, entry_id, file_id):
 
     global global_connection_pool
     logging.info("Received image URL list: %s", image_url_list)
-    logging.info('Starting batch write to db')
+    logging.info('Starting batch insert into db')
 
     query = """
-    UPDATE utb_ImageScraperResult
-    SET ImageURL = %s, CompleteTime = CURRENT_TIMESTAMP
-    WHERE EntryID = %s AND FileID = %s
+    INSERT INTO utb_ImageScraperResult (ImageURL, EntryID, FileID, CompleteTime)
+    VALUES (%s, %s, %s, CURRENT_TIMESTAMP)
     """
 
     try:
@@ -175,9 +174,10 @@ def write_results_to_mysql(image_url_list, entry_id, file_id):
                         query_params = (image_url, entry_id, file_id)
                         cursor.execute(query, query_params)
                 connection.commit()
-                logging.info(f"Batch data written to DB for EntryID: {entry_id} and FileID: {file_id}")
+                logging.info(f"Batch data inserted into DB for EntryID: {entry_id} and FileID: {file_id}")
     except Exception as e:
-        logging.error("Failed to write to DB: %s", e)
+        logging.error("Failed to insert into DB: %s", e)
+        connection.rollback()
         # Optionally, handle or re-raise exception for further processing
 
 class SearchEngineV3:
