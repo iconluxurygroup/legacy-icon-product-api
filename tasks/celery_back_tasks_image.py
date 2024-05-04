@@ -1,4 +1,4 @@
-from celery import chain, chord
+from celery import chain, chord,group
 from celery_worker import celery_app
 from tasks.celery_image_tasks import initial_task, process_itemV2, combine_results,filter_results,process_item_cms
 
@@ -48,13 +48,33 @@ def execute_workflow_cms(brand, sku, entry_id, file_id):
         sku_variations = initial_task(brand, sku)
 
         if sku_variations:
-            for item in sku_variations:
-                result = process_item_cms(brand, item, entry_id, file_id).apply_async()
-                if result:
-                    results.append(result)
-            print("THESE ARE THE RESULTS BELOW")
-            print(results)
-        #     result = workflow.apply_async()
-        #     return result
-        # else:
-        #     return None
+            # for item in sku_variations:
+            #     result = process_item_cms(brand, item, entry_id, file_id).apply_async()
+            #     if result:
+            #         results.append(result)
+            # print("THESE ARE THE RESULTS BELOW")
+            # print(results)
+
+            flow = group([process_itemV2.s(item, brand) for item in sku_variations])
+            result = flow.apply_async()
+            return result
+        else:
+            return None
+
+
+
+# job = group([
+#             add.s(2, 2),
+#             add.s(4, 4),
+#             add.s(8, 8),
+#             add.s(16, 16),
+#             add.s(32, 32),
+# ])
+#
+# result = job.apply_async()
+#
+# result.ready()  # have all subtasks completed?
+# True
+# result.successful() # were all subtasks successful?
+# True
+# result.get()
