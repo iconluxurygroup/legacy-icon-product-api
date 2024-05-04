@@ -20,7 +20,7 @@ def create_task_image_cms(data):
     sku = data[1]
     entry_id = data[2]
     file_id = data[3]
-    task_id= execute_workflow(brand, sku, entry_id, file_id)
+    task_id= execute_workflow_cms(brand, sku, entry_id, file_id)
     return task_id
 
 def execute_workflow(brand, sku, entry_id, file_id):
