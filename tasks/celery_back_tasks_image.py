@@ -34,8 +34,8 @@ def execute_workflow(brand, sku, entry_id, file_id):
                 combine_results.s()  # Callback receives results with items
             ),
             filter_results.s(brand, sku, entry_id, file_id),
-            # classify_urls.s(),
-            # choose_result.s(sku)
+            #classify_urls.s(),
+            #choose_result.s(sku)
         )
 
         result = workflow.apply_async()
@@ -47,7 +47,7 @@ def execute_workflow(brand, sku, entry_id, file_id):
 def execute_workflow_cms(brand, sku, entry_id, file_id):
     sku_variations = initial_task(brand, sku)
     if sku_variations:
-        callback = finalize_group.s(entry_id)  # This will run after all tasks complete
+        callback = finalize_group.s()  # This will run after all tasks complete
         flow = chord([process_item_cms.s(item, brand, entry_id, file_id) for item in sku_variations])(callback)
         return flow.id
     return None
