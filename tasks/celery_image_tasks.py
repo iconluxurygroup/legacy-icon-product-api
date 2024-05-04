@@ -101,7 +101,7 @@ def process_item_cms(item, brand, entry_id, file_id):  # get html and return lis
                     'brand': brand,
                     'brand_domains': []  # get_brand_domains(brand)
                 })
-            write_results_to_mysql(image_url_list[0], int(entry_id), file_id)
+            write_results_to_mysql(image_url_list, int(entry_id), file_id)
             return processed_items
         else:
             print('endless lop')
