@@ -171,6 +171,8 @@ def write_results_to_mysql(image_url_list, entry_id, file_id):
             with connection.cursor() as cursor:
                 for image_url in image_url_list:
                     if image_url:  # Ensure non-empty URLs are processed
+                        print(image_url)
+                        
                         query_params = (image_url, entry_id, file_id)
                         cursor.execute(query, query_params)
                 connection.commit()
