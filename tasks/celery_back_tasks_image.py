@@ -55,7 +55,7 @@ def execute_workflow_cms(brand, sku, entry_id, file_id):
             # print("THESE ARE THE RESULTS BELOW")
             # print(results)
 
-            flow = group([process_itemV2.s(item, brand) for item in sku_variations])
+            flow = group([process_item_cms.s(item, brand) for item in sku_variations])
             result = flow.apply_async()
             return result
         else:
