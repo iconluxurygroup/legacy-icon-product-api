@@ -9,7 +9,7 @@ from tasks.celery_back_tasks import create_task
 
 
 from tasks.celery_helper_image import fetch_task_result_image
-from tasks.celery_back_tasks_image import create_task_image
+from tasks.celery_back_tasks_image import create_task_image,create_task_image_cms
 
 
 app = FastAPI(title="Icon Product Api")
@@ -63,7 +63,10 @@ async def poll_task(task_id: str):
 async def send_product(requestData:RequestData):
     task_id = create_task_image.delay(requestData.dataset_split)
     return {'task_id': str(task_id), 'status': 'Processing'}
-
+@image_router.post('/create_cms')
+async def send_product(requestData:RequestData):
+    task_id = create_task_image_cms.delay(requestData.dataset_split)
+    return {'task_id': str(task_id), 'status': 'Processing'}
 @image_router.get("/poll/{task_id}")
 async def poll_task(task_id: str):
     result = fetch_task_result_image(task_id)
