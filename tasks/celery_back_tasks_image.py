@@ -43,13 +43,22 @@ def execute_workflow(brand, sku, entry_id, file_id):
     else:
         return None
 
+
 def execute_workflow_cms(brand, sku, entry_id, file_id):
     sku_variations = initial_task(brand, sku)
     if sku_variations:
-        flow = group([process_item_cms.s(item, brand, entry_id, file_id) for item in sku_variations])
-        result = flow.apply_async()
-        return result.id  # Return the group task ID
+        callback = finalize_group.s(entry_id)  # This will run after all tasks complete
+        flow = chord([process_item_cms.s(item, brand, entry_id, file_id) for item in sku_variations])(callback)
+        return flow.id
     return None
+
+@celery_app.task
+def finalize_group(entry_id):
+    # Logic to handle after all tasks complete
+    print("All tasks completed. Results:")
+    for result in entry_id:
+        print(result)
+    #update_database_with_group_result(entry_id)
 
 
 

@@ -69,8 +69,48 @@ def process_itemV2(item, brand):  # get html and return list of parsed google ur
         print('endless lop')
         return process_itemV2(item, brand)
 
-@shared_task
-def process_item_cms(item, brand, entry_id, file_id):  # get html and return list of parsed google urls
+# @shared_task
+# def process_item_cms(item, brand, entry_id, file_id):  # get html and return list of parsed google urls
+#         processed_items = []
+#         search_engine = SearchEngineV3()
+#         search_engine.get_results(item)
+#
+#         if search_engine.image_url_list and search_engine.image_desc_list and search_engine.image_source_list:
+#             image_url_list = search_engine.image_url_list
+#             image_desc_list = search_engine.image_desc_list
+#             image_source_list = search_engine.image_source_list
+#
+#             # Check if either urls or descriptions list is empty
+#             if not image_url_list or not image_desc_list or not image_source_list:
+#                 raise ValueError("Either 'urls' or 'descriptions' list is empty. or source is empty")
+#
+#             # Check if urls and descriptions lists are of unequal lengths
+#             if len(image_url_list) != len(image_desc_list):
+#                 # Determine the minimum length
+#                 min_length = min(len(image_url_list), len(image_desc_list))
+#
+#                 # Truncate the lists to the minimum length
+#                 image_url_list = image_url_list[:min_length]
+#                 image_desc_list = image_desc_list[:min_length]
+#
+#             for url, description in zip(image_url_list, image_desc_list):
+#                 processed_items.append({
+#                     'url': url,
+#                     'description': description,
+#                     'sku': item,
+#                     'brand': brand,
+#                     'brand_domains': []  # get_brand_domains(brand)
+#                 })
+#             write_results_to_mysql(image_url_list, int(entry_id), file_id)
+#             return processed_items
+#         else:
+#             print('endless lop')
+#             return process_item_cms(item, brand, entry_id, file_id)
+
+@shared_task(bind=True)
+def process_item_cms(self, item, brand, entry_id, file_id):
+    try:
+        self.update_state(state='STARTED', meta={'info': 'Initializing search'})
         processed_items = []
         search_engine = SearchEngineV3()
         search_engine.get_results(item)
@@ -80,16 +120,11 @@ def process_item_cms(item, brand, entry_id, file_id):  # get html and return lis
             image_desc_list = search_engine.image_desc_list
             image_source_list = search_engine.image_source_list
 
-            # Check if either urls or descriptions list is empty
             if not image_url_list or not image_desc_list or not image_source_list:
-                raise ValueError("Either 'urls' or 'descriptions' list is empty. or source is empty")
+                raise ValueError("Either 'urls' or 'descriptions' list is empty, or source is empty")
 
-            # Check if urls and descriptions lists are of unequal lengths
             if len(image_url_list) != len(image_desc_list):
-                # Determine the minimum length
                 min_length = min(len(image_url_list), len(image_desc_list))
-
-                # Truncate the lists to the minimum length
                 image_url_list = image_url_list[:min_length]
                 image_desc_list = image_desc_list[:min_length]
 
@@ -99,13 +134,19 @@ def process_item_cms(item, brand, entry_id, file_id):  # get html and return lis
                     'description': description,
                     'sku': item,
                     'brand': brand,
-                    'brand_domains': []  # get_brand_domains(brand)
+                    'brand_domains': []  # Assume function exists to populate this
                 })
+
+            self.update_state(state='PROGRESS', meta={'info': 'Writing results to database'})
             write_results_to_mysql(image_url_list, int(entry_id), file_id)
             return processed_items
         else:
-            print('endless lop')
+            self.update_state(state='RETRY', meta={'info': 'Retry due to empty search results'})
             return process_item_cms(item, brand, entry_id, file_id)
+    except Exception as e:
+        self.update_state(state='FAILURE', meta={'exc': str(e), 'info': 'Processing failed'})
+        raise e
+
 @shared_task
 def filter_results(url_list_with_items, brand, sku, entry_id, file_id):
     print(entry_id,file_id)
