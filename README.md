@@ -19,22 +19,13 @@
 
 Issues:
 
-
-1. look into having it fetch resources on web storage
-
 2. I've caught Currency coming back as $ lets unify it to USD
 3. Filter values should be loaded dynamically: self.filtered_urls = self.filter_urls_by_currency(['/us/','/en-us/','/us-en/','/us.','modesens.com/product','fwrd.com/mobile/product','marcjacobs.com/default/'], self.filtered_urls)
 4. whitelist urls to be fetched dynamically
 5. Pls review all functions and make sure there is a unified format for returning Null. None, 'Error' Lets pick one and use it. Most likely None to ease contional statements. 
 8. 'approved_seller_list' needs to be read from web
 9. See what kind of exceptions are occuring and be more specific 'tasks/classes_and_utility.py:191:19:', 'tasks/classes_and_utility.py:310:15:' 'Catching too general exception Exception (broad-exception-caught)'
-#Review 
 
-
-PRIORITY:
-0. Refactor the process of parsing html. Needs to be easy to add new Parser class and implement into its logic flow. Lets discuss this first.
-- Search logic, setting type that will determine what is considered an acceptable result. Ex. Image search type will take modesens any main image seller does not matter.  
-- Variation, allow for a bypass brand settings and just create variations based on article model color input
-- Currency support, user will choose US or EURO, need to provide logical support for this. for both the scraperapi to choose country and filter for urls as they are coming in from google results. Confirm there arent more dependancies.
+- Currency support, user will choose US or EURO, need to provide logical support for this.
 
 
