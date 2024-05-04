@@ -49,9 +49,10 @@ def execute_workflow_cms(brand, sku, entry_id, file_id):
 
         if sku_variations:
             for item in sku_variations:
-                result = process_item_cms(brand, item, entry_id, file_id)
+                result = process_item_cms(brand, item, entry_id, file_id).apply_async()
                 if result:
                     results.append(result)
+            print("THESE ARE THE RESULTS BELOW")
             print(results)
         #     result = workflow.apply_async()
         #     return result
