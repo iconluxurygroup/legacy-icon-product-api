@@ -44,17 +44,9 @@ def execute_workflow(brand, sku, entry_id, file_id):
         return None
 
 def execute_workflow_cms(brand, sku, entry_id, file_id):
-        results = []
         sku_variations = initial_task(brand, sku)
 
         if sku_variations:
-            # for item in sku_variations:
-            #     result = process_item_cms(brand, item, entry_id, file_id).apply_async()
-            #     if result:
-            #         results.append(result)
-            # print("THESE ARE THE RESULTS BELOW")
-            # print(results)
-
             flow = group([process_item_cms.s(item, brand,entry_id, file_id) for item in sku_variations])
             result = flow.apply_async()
             return result
