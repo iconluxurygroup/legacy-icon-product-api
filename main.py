@@ -87,14 +87,7 @@ async def poll_task(task_id: str):
 @image_routerV2.get('/status/{task_id}')
 async def get_status(task_id: str):
     result = AsyncResult(task_id)
-    if result.ready():
-        if result.successful():
-            return {'status': 'Complete', 'result': result.get()}
-        else:
-            return {'status': 'Failed', 'result': None}
-    else:
-        return {'status': 'Processing'}
-
+    return {"status": result.state}
 @image_routerV2.get('/results/{task_id}')
 async def get_results(task_id: str):
     result = AsyncResult(task_id)
