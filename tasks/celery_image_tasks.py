@@ -124,27 +124,62 @@ def filter_results(url_list_with_items, brand, sku, entry_id, file_id):
     else:
         write_results_to_mysql(filter_results, entry_id, file_id)
         return filter_results
-def write_results_to_mysql(result, entry_id, file_id):
+# def write_results_to_mysql(result, entry_id, file_id):
+#     global global_connection_pool
+#     print(result)
+#     print('Writing to db')
+#     image_url = 'None found in this filter'
+#     if result != 'None found in this filter' and result is not None:
+#         image_url = result
+#
+#     query = "UPDATE utb_ImageScraperResult SET ImageURL = %s,CompleteTime = CURRENT_TIMESTAMP WHERE EntryID = %s AND FileID = %s"
+#     query_params = (image_url, entry_id, file_id)
+#
+#     connection = global_connection_pool.get_connection()
+#     cursor = connection.cursor()
+#
+#     cursor.execute(query, query_params)
+#     connection.commit()
+#
+#     cursor.close()
+#     connection.close()
+#
+#     print(f"Data written to DB for EntryID: {entry_id} and FileID: {file_id}")
+def write_results_to_mysql(image_url_list, entry_id, file_id):
+    """
+    Updates the database record with multiple image URLs and the current timestamp.
+
+    Parameters:
+    image_url_list (list of str): List of image URLs.
+    entry_id (int): The identifier for the entry.
+    file_id (int): The identifier for the file.
+
+    """
+    import logging
+
     global global_connection_pool
-    print(result)
-    print('Writing to db')
-    image_url = 'None found in this filter'
-    if result != 'None found in this filter' and result is not None:
-        image_url = result
+    logging.info("Received image URL list: %s", image_url_list)
+    logging.info('Starting batch write to db')
 
-    query = "UPDATE utb_ImageScraperResult SET ImageURL = %s,CompleteTime = CURRENT_TIMESTAMP WHERE EntryID = %s AND FileID = %s"
-    query_params = (image_url, entry_id, file_id)
+    query = """
+    UPDATE utb_ImageScraperResult
+    SET ImageURL = %s, CompleteTime = CURRENT_TIMESTAMP
+    WHERE EntryID = %s AND FileID = %s
+    """
 
-    connection = global_connection_pool.get_connection()
-    cursor = connection.cursor()
+    try:
+        with global_connection_pool.get_connection() as connection:
+            with connection.cursor() as cursor:
+                for image_url in image_url_list:
+                    if image_url:  # Ensure non-empty URLs are processed
+                        query_params = (image_url, entry_id, file_id)
+                        cursor.execute(query, query_params)
+                connection.commit()
+                logging.info(f"Batch data written to DB for EntryID: {entry_id} and FileID: {file_id}")
+    except Exception as e:
+        logging.error("Failed to write to DB: %s", e)
+        # Optionally, handle or re-raise exception for further processing
 
-    cursor.execute(query, query_params)
-    connection.commit()
-
-    cursor.close()
-    connection.close()
-
-    print(f"Data written to DB for EntryID: {entry_id} and FileID: {file_id}")
 class SearchEngineV3:
     def __init__(self):
         global global_connection_pool
