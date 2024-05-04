@@ -9,7 +9,7 @@ from tasks.celery_back_tasks import create_task
 
 
 from tasks.celery_helper_image import fetch_task_result_image
-from tasks.celery_back_tasks_image import create_task_image,create_task_image_cms
+from tasks.celery_back_tasks_image import create_task_image,execute_workflow_cms
 
 
 app = FastAPI(title="Icon Product Api")
@@ -26,6 +26,7 @@ app.add_middleware(
 sample_router = APIRouter()
 msrp_router = APIRouter()
 image_router = APIRouter()
+image_routerV2 = APIRouter()
 # Define a router for product-related operations
 
 
@@ -63,10 +64,17 @@ async def poll_task(task_id: str):
 async def send_product(requestData:RequestData):
     task_id = create_task_image.delay(requestData.dataset_split)
     return {'task_id': str(task_id), 'status': 'Processing'}
-@image_router.post('/create_cms')
-async def send_product(requestData:RequestData):
-    task_id = create_task_image_cms.delay(requestData.dataset_split)
-    return {'task_id': str(task_id), 'status': 'Processing'}
+# @image_router.post('/create_cms')
+# async def send_product(requestData:RequestData):
+#     task_id = create_task_image_cms.delay(requestData.dataset_split)
+#     return {'task_id': str(task_id), 'status': 'Processing'}
+@image_routerV2.post('/create_cms')
+async def send_product(requestData: RequestData):
+    task_id = execute_workflow_cms(*requestData.dataset_split)
+    if task_id:
+        return {'task_id': task_id, 'status': 'Processing'}
+    else:
+        raise HTTPException(status_code=400, detail="Failed to start the workflow")
 @image_router.get("/poll/{task_id}")
 async def poll_task(task_id: str):
     result = fetch_task_result_image(task_id)
@@ -76,11 +84,28 @@ async def poll_task(task_id: str):
         return {'status': 'Completed', 'result': result['result']}
     else:
         raise HTTPException(status_code=500, detail="Unexpected task status")    
-    
+@image_routerV2.get('/status/{task_id}')
+async def get_status(task_id: str):
+    result = AsyncResult(task_id)
+    if result.ready():
+        if result.successful():
+            return {'status': 'Complete', 'result': result.get()}
+        else:
+            return {'status': 'Failed', 'result': None}
+    else:
+        return {'status': 'Processing'}
+
+@image_routerV2.get('/results/{task_id}')
+async def get_results(task_id: str):
+    result = AsyncResult(task_id)
+    if result.ready():
+        return {'status': 'Complete', 'data': result.get()}
+    return {'status': 'Still Processing'}
     
 app.include_router(sample_router, prefix="/api/v1/sample")
 app.include_router(msrp_router, prefix="/api/v1/msrp")
 app.include_router(image_router, prefix="/api/v1/image")
+app.include_router(image_routerV2, prefix="/api/v2/image")
 
 
 

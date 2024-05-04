@@ -44,14 +44,12 @@ def execute_workflow(brand, sku, entry_id, file_id):
         return None
 
 def execute_workflow_cms(brand, sku, entry_id, file_id):
-        sku_variations = initial_task(brand, sku)
-
-        if sku_variations:
-            flow = group([process_item_cms.s(item, brand,entry_id, file_id) for item in sku_variations])
-            result = flow.apply_async()
-            return result
-        else:
-            return None
+    sku_variations = initial_task(brand, sku)
+    if sku_variations:
+        flow = group([process_item_cms.s(item, brand, entry_id, file_id) for item in sku_variations])
+        result = flow.apply_async()
+        return result.id  # Return the group task ID
+    return None
 
 
 
