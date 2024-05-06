@@ -9,7 +9,7 @@ services:
       - redis
 
   redis:
-    image: "redis:alpine"
+    image: "redis:latest"
     ports:
       - "6379:6379"
     command: redis-server --client-output-buffer-limit pubsub 512mb 128mb 60
