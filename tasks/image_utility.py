@@ -1,17 +1,15 @@
-import json,re,requests,logging,base64
+import json,re,requests,logging,base64,random,time
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 from tasks.LR import LR
 import zlib
-import re
-
 from tasks.classes_and_utility import BrandSettings
-from settings import BRANDSETTINGSPATH
+from settings import BRANDSETTINGSPATH,SERVERLESS_URL_SETTINGS
 from html.parser import HTMLParser
 import html
-
-from html.parser import HTMLParser
-import html
+import string
+import unicodedata
+from tasks.google_parser import get_original_images as GP
 # Enhanced HTML Parser for extracting specific image data
 class EnhancedHTMLParser(HTMLParser):
     def __init__(self):
@@ -122,7 +120,7 @@ class SKUManager:
     #     for i in range(sku_len):
     #         if not sku[i].isalnum():
     #             if not sku[i] in temp_dict:
-    #                 temp_dict[sku[i]]=1
+    #                 temp_dict[sku[i]]=1FilterUrls
     #             else:
     #                 temp_dict[sku[i]]+=1
         
@@ -189,71 +187,175 @@ class SKUManager:
 
 class SearchEngine:
     def __init__(self,variation):
-        self.parsed_results = []
         ###place holder for html body
         self.str_html_body = ""
-        self.descriptions = []
         self.variation = variation
-        #!SCRAPER API DEPENDS ON search_query
-        #self.query_url = self.search_query(variation)
-        #self.g_html_response = self.send_regular_request_SCRAPERAPI(self.query_url)
-        #RETURNS HTML
         self.g_html_response = self.get_google_image_nimble(self.variation)
         print(f"Status Code : {self.g_html_response['status']}")
         
         if self.g_html_response['status'] == 200:
             self.str_html_body = self.g_html_response['body']
-            #print(self.str_html_body)
             if "Looks like there aren’t any matches for your search" in self.str_html_body:
                 print("NO PRODUCT FOUND")
                 return None               
 
-            elif "Looks like there aren’t any matches for your search" not in self.str_html_body:
+            # elif "Looks like there aren’t any matches for your search" not in self.str_html_body:
+            #     print('Looking!')
+
+            #     hiQResponse = self.get_original_images(self.str_html_body)[0]
+                
+            #     Descrip = self.get_original_images(self.str_html_body)[1]
+            elif "Looks like there aren’t any matches for your search" not in self.str_html_body and '["GRID_STATE0"' in self.str_html_body:
                 print('Looking!')
-                hiQResponse = self.get_original_images(self.str_html_body)[0]
-                Descrip = self.get_original_images(self.str_html_body)[1]
 
-                ##parser = EnhancedHTMLParser()
-
-                # Step 3: Feed the HTML Content to the Parser
-                ##parser.feed(self.str_html_body)
-
-                # Step 4: Access Extracted Items
-                ##for item in parser.items:
-                ##    print('----------------------')
-                ##    print(item)
-                ##    print('XXXXXXXXXXXXXXXXXXXXXX')
-                ##    self.parsed_results.append(item)
-##
-##
-                ##print('XXXXXXXXXXXXXXXXXXXXXX')
-                ##print(self.parsed_results)
-                ##print('+++++++++++++++++++++++++++++')
-
+                hiQResponse = GP(self.str_html_body)[0]
+               
+                Descrip = GP(self.str_html_body)[1]
 
                 if hiQResponse:
                     self.parsed_results = hiQResponse
                     self.descriptions = Descrip
                     print(f"Parsed Url: {self.parsed_results}\nDescriptions: {self.descriptions}")
+
+                else:
+                    print('no descriptions or urls')
+                #     self.parsed_results = []
+                #     self.descriptions = []
+                #     print(f"Parsed Url: {self.parsed_results}\nDescriptions: {self.descriptions}")
+            else:
+                print('trying again!!!!!!!!!!!!!!!!!!!!!!')
+                self.workflow_search(self.variation)
+
+
+    def workflow_search(self,variation):
+        self.g_html_response = self.get_google_image_nimble(self.variation)
+        print(f"Status Code : {self.g_html_response['status']}")
+        
+        if self.g_html_response['status'] == 200:
+            self.str_html_body = self.g_html_response['body']
+            if "Looks like there aren’t any matches for your search" in self.str_html_body:
+                print("NO PRODUCT FOUND")
+                return None               
+            elif "Looks like there aren’t any matches for your search" not in self.str_html_body and '["GRID_STATE0"' in self.str_html_body:
+                print('Looking!')
+
+                hiQResponse = GP(self.str_html_body)[0]
+               
+                Descrip = GP(self.str_html_body)[1]
+
+                if hiQResponse:
+                    self.parsed_results = hiQResponse
+                    self.descriptions = Descrip
+                    print(f"Parsed Url: {self.parsed_results}\nDescriptions: {self.descriptions}") 
+
+                else:
+                    return None
+            else:
+                print('trying again!!!!!!!')
+                self.workflow_search(self.variation)   
+            
+
+    def fetch_serverless_no_js_url(self,settings_url, max_retries=3):
+        retries = 0
+        while retries < max_retries:
+            try:
+                response = requests.get(settings_url, headers={'User-Agent': 'Mozilla/5.0'})
+                if response.status_code == 200:
+                    data = response.json()
+                    #nimble
+                    #serverless_urls = data.get("serverless-urls", {}).get("no_js", [])
+                    serverless_urls = data.get("serverless-urls", {}).get("noip_nojs", [])
+                    if serverless_urls:
+                        return serverless_urls
+                retries += 1
+                print(f"Retry {retries}/{max_retries} for fetching serverless URLs...")
+            except requests.RequestException as e:
+                print(f"Failed to fetch serverless URLs: {e}")
+                retries += 1
+        
+        print("Failed to fetch serverless URLs after maximum retries.")
+        return []
+
+
+
+
+    # def get_google_image_nimble(self, query):
+    #     serverless_urls = self.fetch_serverless_no_js_url(str(SERVERLESS_URL_SETTINGS))
+    #     if not serverless_urls:
+    #         return {'status': 404, 'body': "Failed to obtain serverless URLs."}
+        
+    #     attempt_delay = 1  # Start with a 1 second delay
+    #     max_attempts = 3
+    #     for attempt in range(max_attempts):
+    #         func_url = random.choice(serverless_urls)  # Select a URL at random
+    #         print(f"Attempt {attempt+1}: Current Url: {func_url}")
+    #         headers = {'Content-Type': 'application/json'}
+
+    #         try:
+    #             response = requests.get(f'{func_url}?query={query}', headers=headers, timeout=185)
+    #             if response.status_code == 200:
+    #                 response_json = response.json()
+    #                 result = response_json.get('body', None)
+    #                 if result:
+    #                     return {'status': response.status_code, 'body': self.unpack_content(result)}
+    #             else:
+    #                 print(f"Request failed with status code: {response.status_code}")
+    #         except requests.RequestException as e:
+    #             print(f"Error making request: {e}")
+
+    #         time.sleep(attempt_delay)  # Apply the delay
+    #         attempt_delay *= 2  # Exponentially increase the delay for the next attempt
+
+    #         # Remove the failed URL from the list to avoid retrying it
+    #         serverless_urls.remove(func_url)
+    #         if not serverless_urls:  # If we've exhausted all URLs
+    #             print("Exhausted all serverless URLs.")
+    #             break
+
+    #     return {'status': 404, 'body': "Failed after all attempts."}
+
     def get_google_image_nimble(self, query):
-        func_url = 'https://faas-nyc1-2ef2e6cc.doserverless.co/api/v1/web/fn-af66235d-5f26-40d2-8836-25a71fef3192/default/image-function-2'
-        headers = {
-    'Content-Type': 'application/json',
-}
-        #payload = { 'api_key': 'ab75344fcf729c63c9665e8e8a21d985', 'url': url, 'country_code': 'us'}
-    #    payload = { 'api_key': 'ab75344fcf729c63c9665e8e8a21d985', 'url': url}
-        r = requests.get(f'{func_url}?query={query}', headers=headers,timeout=180)
-        print(r.status_code)
-        response_json = r.json()
-        print(response_json)
-        #print(response_json)
-        return {'status': r.status_code, 'body': self.unpack_content(response_json.get('body',None))}  
+        serverless_urls = self.fetch_serverless_no_js_url(str(SERVERLESS_URL_SETTINGS))
+        if not serverless_urls:
+            return {'status': 404, 'body': "Failed to obtain serverless URLs."}
+        
+        last_used_url = None
+        attempt_delay = 1  # Start with a 1 second delay
+
+        for _ in range(len(serverless_urls) * 3):  # Total attempts: thrice the number of serverless URLs
+            # Select a random URL avoiding the last used one
+            current_urls = [url for url in serverless_urls if url != last_used_url]
+            func_url = random.choice(current_urls)
+
+            print(f"Using URL: {func_url}")
+            headers = {'Content-Type': 'application/json'}
+
+            try:
+                response = requests.get(f'{func_url}?query={query}', headers=headers, timeout=185)
+                if response.status_code == 200:
+                    response_json = response.json()
+                    result = response_json.get('body', None)
+                    if result:  # If result is not None, unpack and return
+                        return {'status': response.status_code, 'body': self.unpack_content(result)}
+                    # If result is None, proceed to retry with a different URL
+                else:
+                    print(f"Request failed with status code: {response.status_code}")
+            except requests.RequestException as e:
+                print(f"Error making request: {e}")
+
+            last_used_url = func_url  # Update last used URL
+            time.sleep(attempt_delay)  # Apply the delay
+            attempt_delay = min(attempt_delay * 2, 60)  # Exponentially increase the delay, up to a max of 60 seconds
+
+        # After trying all URLs without success
+        return {'status': 404, 'body': "Failed after all attempts."}
+
 
     def unpack_content(self,encoded_content):
         if encoded_content:
             compressed_content = base64.b64decode(encoded_content)
             original_content = zlib.decompress(compressed_content)
-            print(original_content)
+            
             return str(original_content)  # Return as binary data
         return None
 
@@ -283,118 +385,116 @@ class SearchEngine:
     #     #          results.append(links[0]['href'])
     #     return soup
     
-    def get_original_images(self,html):
-        soup = BeautifulSoup(html, 'html.parser')
-        all_script_tags = soup.select("script")
+    # def get_original_images(self,html):
+    #     soup = BeautifulSoup(html, 'html.parser')
+    #     all_script_tags = soup.select("script") 
+    #     # Extract matched images data
+    #     matched_images_data = "".join(re.findall(r"AF_initDataCallback\(([^<]+)\);", str(all_script_tags)))
+    #     #matched_images_data = "".join(re.findall(r"AF_initDataCallback\(({key: 'ds:1'.*?)\);</script>", str(all_script_tags)))
+    #     print(matched_images_data)
+    #     matched_images_data_fix = json.dumps(matched_images_data)
+    #     print(matched_images_data)
+    #     matched_images_data_json = json.loads(matched_images_data_fix)
+    #     print(matched_images_data_json)
+    #     matched_google_image_data = re.findall(r'\"b-GRID_STATE0\"(.*)sideChannel:\s?{}}', matched_images_data_json)
+    #     print(matched_google_image_data)
+    #     # Extract thumbnails
+    #     matched_google_images_thumbnails = ", ".join(
+    #         re.findall(r'\[\"(https\:\/\/encrypted-tbn0\.gstatic\.com\/images\?.*?)\",\d+,\d+\]',
+    #                 str(matched_google_image_data))).split(", ")
+    #     print(matched_google_images_thumbnails)
+    #     thumbnails = [
+    #         bytes(bytes(thumbnail, "ascii").decode("unicode-escape"), "ascii").decode("unicode-escape") for thumbnail in matched_google_images_thumbnails
+    #     ]
+    #     ##########
+    #     print('thumbnails')
+    #     print(thumbnails)
+    #     removed_matched_google_images_thumbnails = re.sub(
+    #         r'\[\"(https\:\/\/encrypted-tbn0\.gstatic\.com\/images\?.*?)\",\d+,\d+\]', "", str(matched_google_image_data))  
+    #     # Extract full resolution images
+    #     matched_google_full_resolution_images = re.findall(r"(?:'|,),\[\"(https:|http.*?)\",\d+,\d+\]", removed_matched_google_images_thumbnails)   
+    #     full_res_images = [
+    #         bytes(bytes(img, "ascii").decode("unicode-escape"), "ascii").decode("unicode-escape") for img in matched_google_full_resolution_images
+    #     ]   
+    #     # Assume descriptions are extracted
+    #     descriptions = LR().get(soup, '"2008":[null,"', '"]}],null,') # Replace 'description_pattern' with your actual regex pattern for descriptions   
+    #     final_thumbnails = []
+    #     final_full_res_images = []
+    #     final_descriptions = [] 
+    #     # Iterate over each thumbnail
+    #     for i, thumbnail in enumerate(thumbnails):
+    #         try:
+    #             # If a full resolution image exists, add it. If not, add the thumbnail instead.
+    #             final_thumbnails.append(thumbnail)
+    #             final_full_res_images.append(full_res_images[i] if i < len(full_res_images) else thumbnail)
+    #             final_descriptions.append(descriptions[i])
+    #         except IndexError:
+    #             # If there is an index error, it means a description could not be found for the current thumbnail. So skip this thumbnail.
+    #             continue    
+    #     return final_full_res_images, final_descriptions,final_thumbnails   
 
-        # Extract matched images data
-        matched_images_data = "".join(re.findall(r"AF_initDataCallback\(([^<]+)\);", str(all_script_tags)))
-        #matched_images_data = "".join(re.findall(r"AF_initDataCallback\(({key: 'ds:1'.*?)\);</script>", str(all_script_tags)))
-        print(matched_images_data)
-        matched_images_data_fix = json.dumps(matched_images_data)
-        print(matched_images_data)
-        matched_images_data_json = json.loads(matched_images_data_fix)
-        print(matched_images_data_json)
-        matched_google_image_data = re.findall(r'\"b-GRID_STATE0\"(.*)sideChannel:\s?{}}', matched_images_data_json)
-        print(matched_google_image_data)
-        # Extract thumbnails
-        matched_google_images_thumbnails = ", ".join(
-            re.findall(r'\[\"(https\:\/\/encrypted-tbn0\.gstatic\.com\/images\?.*?)\",\d+,\d+\]',
-                    str(matched_google_image_data))).split(", ")
-        print(matched_google_images_thumbnails)
-        thumbnails = [
-            bytes(bytes(thumbnail, "ascii").decode("unicode-escape"), "ascii").decode("unicode-escape") for thumbnail in matched_google_images_thumbnails
-        ]
-        ##########
-        print('thumbnails')
-        print(thumbnails)
-        removed_matched_google_images_thumbnails = re.sub(
-            r'\[\"(https\:\/\/encrypted-tbn0\.gstatic\.com\/images\?.*?)\",\d+,\d+\]', "", str(matched_google_image_data))
+    # def get_original_images(self, html):
+    #     #rstring = self.generate_random_name()
+    #     print('---html start---')
+    #     print(html)
+    #     print('---html end---')
+    #     #filepath = str(rstring)+'.txt'
+    #     #with open(filepath, 'w') as file:
+    #         #file.write(str(html))
+    #     matched_images_data = "".join(re.findall(r"AF_initDataCallback\(([^<]+)\);", str(html)))
 
-        # Extract full resolution images
-        matched_google_full_resolution_images = re.findall(r"(?:'|,),\[\"(https:|http.*?)\",\d+,\d+\]", removed_matched_google_images_thumbnails)
+    #     matched_images_data_fix = json.dumps(matched_images_data)
+    #     matched_images_data_json = json.loads(matched_images_data_fix)
 
-        full_res_images = [
-            bytes(bytes(img, "ascii").decode("unicode-escape"), "ascii").decode("unicode-escape") for img in matched_google_full_resolution_images
-        ]
+    #     matched_google_image_data = re.findall(r'\"b-GRID_STATE0\"(.*)sideChannel:\s?{}}', matched_images_data_json)
 
-        # Assume descriptions are extracted
-        descriptions = LR().get(soup, '"2008":[null,"', '"]}],null,') # Replace 'description_pattern' with your actual regex pattern for descriptions
+    #     # Extract thumbnails
+    #     matched_google_images_thumbnails = ", ".join(
+    #         re.findall(r'\[\"(https\:\/\/encrypted-tbn0\.gstatic\.com\/images\?.*?)\",\d+,\d+\]',
+    #                 str(matched_google_image_data))).split(", ")
 
-        final_thumbnails = []
-        final_full_res_images = []
-        final_descriptions = []
+    #     thumbnails = [
+    #         bytes(bytes(thumbnail, "ascii").decode("unicode-escape"), "ascii").decode("unicode-escape") for thumbnail in matched_google_images_thumbnails
+    #     ]
+        
+    #     removed_matched_google_images_thumbnails = re.sub(
+    #         r'\[\"(https\:\/\/encrypted-tbn0\.gstatic\.com\/images\?.*?)\",\d+,\d+\]', "", str(matched_google_image_data))
 
-        # Iterate over each thumbnail
-        for i, thumbnail in enumerate(thumbnails):
-            try:
-                # If a full resolution image exists, add it. If not, add the thumbnail instead.
-                final_thumbnails.append(thumbnail)
-                final_full_res_images.append(full_res_images[i] if i < len(full_res_images) else thumbnail)
-                final_descriptions.append(descriptions[i])
-            except IndexError:
-                # If there is an index error, it means a description could not be found for the current thumbnail. So skip this thumbnail.
-                continue
+    #     # Extract full resolution images
+    #     matched_google_full_resolution_images = re.findall(r"(?:'|,),\[\"(https:|http.*?)\",\d+,\d+\]", removed_matched_google_images_thumbnails)
 
-        return final_full_res_images, final_descriptions,final_thumbnails
-    
-    
-from urllib.parse import urlparse
+    #     full_res_images = [
+    #         bytes(bytes(img, "ascii").decode("unicode-escape"), "ascii").decode("unicode-escape") for img in matched_google_full_resolution_images
+    #     ]
 
-# class FilterUrls:
-#     def __init__(self, list_url, brand, sku):
-#         self.whitelisted_domains = [
-#             "fwrd.com",
-#             "modesens.com",
-#             "saksfifthavenue.com",
-#             "saksoff5th.com",
-#             "nordstrom.com",
-#             "nordstromrack.com",
-#             "giglio.com",
-#             "italist.com",
-#             "farfetch.com",
-#             "mytheresa.com",
-#             "neimanmarcus.com",
-#             "jomashop.com",
-#         ]
-#         self.brand = brand.lower()  # Ensure brand is lowercase for comparison
-#         self.sku = sku.lower()  # Ensure SKU is lowercase for comparison
-#         self.url_list_nodups = self.remove_duplicates(list_url)
-#         self.filtered_urls = self.filter_urls(self.url_list_nodups)
+    #     # Assume descriptions are extracted
+    #     descriptions = LR().get(html, '"2008":[null,"', '"]}],null,') # Replace 'description_pattern' with your actual regex pattern for descriptions
+    #     #descriptions = []
+    #     final_thumbnails = []
+    #     final_full_res_images = []
+    #     final_descriptions = []
+    #     # Iterate over each thumbnail
+    #     for i, thumbnail in enumerate(thumbnails):
+    #         try:
+    #             # If a full resolution image exists, add it. If not, add the thumbnail instead.
+    #             final_thumbnails.append(thumbnail)
+    #             if i < len(full_res_images) and full_res_images[i] != '':
+    #                 final_full_res_images.append(full_res_images[i])
+    #             else:
+    #                 final_full_res_images.append(thumbnail)
+    #             final_descriptions.append(descriptions[i])
+    #         except IndexError:
+    #             # If there is an index error, it means a description could not be found for the current thumbnail. So skip this thumbnail.
+    #             continue
 
-#     def filter_urls(self, urls):
-#         brand_urls = []
-#         whitelist_urls = []
-#         sku_urls = []
 
-#         for url in urls:
-#             url = url.strip()
-#             if not url.startswith(('http://', 'https://')):
-#                 url = 'http://' + url
+    #     print(f"Thumbs\n____________________________\n{final_thumbnails}\n-----------------------------------")
+    #     print(f"Full REs\n____________________________\n{final_full_res_images}\n-----------------------------------")
+    #     print(f"Final Desc\n____________________________\n{final_descriptions}\n-----------------------------------")
 
-#             domain = urlparse(url).netloc.lower()
-#             if domain.startswith('www.'):
-#                 domain = domain[4:]
+    #     return final_full_res_images, final_descriptions,final_thumbnails
 
-#             # Check if URL contains the brand or SKU
-#             if self.brand in url.lower():
-#                 brand_urls.append(url)
-#             elif self.sku in url.lower():
-#                 sku_urls.append(url)
-#             elif domain in [domain.replace('www.', '') for domain in self.whitelisted_domains]:
-#                 whitelist_urls.append(url)
 
-#         # Combine the lists in the specified order
-#         return brand_urls + whitelist_urls + sku_urls
-
-#     def remove_duplicates(self, input_list):
-#         seen = set()
-#         result = []
-#         for item in input_list:
-#             if item not in seen:
-#                 seen.add(item)
-#                 result.append(item)
-#         return result
 from urllib.parse import urlparse
 from itertools import product
 class FilterUrls:
@@ -420,6 +520,7 @@ class FilterUrls:
         self.brand = brand.lower()
         self.sku = sku.lower()
         self.url_dicts_nodups = self.remove_dups(url_dicts)
+
         self.filtered_result = self.filter_image_dict(self.url_dicts_nodups)
         
         
@@ -610,9 +711,7 @@ class FilterUrls:
                 brand_names = self.remove_duplicates(brand_names)
                 print(f"This is the brand names {brand_names}")
             else:
-                brand_names = [brand]
-            #brand_names_unclean=["ysl", "yves saint laurent", "saint laurent", "saint-laurent"] # to be implemented returns all possible ways that the brand name may be in the url/description i.e YSL, Yves Saint Laurent, etc
-            
+                brand_names = [brand]           
             print(f"This is the brand names {brand_names}")
             possible_scores=[]
             print(f"This is the possible scores {possible_scores}")
@@ -655,7 +754,7 @@ class FilterUrls:
                     print(f"This score: {current_score} came from this dict {amc_dict}")
                 #print(f"These are all the possible scores {possible_scores}")
                 #filtered_scores = [score for score in possible_scores if score >= threshold]
-                return filtered_scores
+                # return filtered_scores
 
                 
                 
@@ -793,7 +892,7 @@ class FilterUrls:
                     # If both article and model are present, award points for them
                     if article_present and model_present:
                         current_score += article_model_score_value
-                        print(f"article and model are present {value}")
+                        #print(f"article and model are present {value}")
                         # Check for color only if article and model are present
                         color_value = self.clean_string(amc_dict.get("color", ""))
                         if color_value and (color_value in url or color_value in description):
@@ -825,7 +924,10 @@ class FilterUrls:
                         filtered_scores = filtered_scores.sort(reverse=True)
                         print(filtered_scores, '----- filtered scores')
                         return filtered_scores
-                    
+        else:
+            # Return an empty list when possible_amc is empty or None
+            return []
+
 
 
 
@@ -834,10 +936,10 @@ class FilterUrls:
         domain = parsed_url.netloc
         return domain
     def get_score_3(self, url:str, brand_domains:list[str], json_domains:dict):
-        if brand_domains:
-            for brand_domain in brand_domains:
-                if brand_domain in self.get_domain(url):
-                    return 100000000
+        #if brand_domains:
+        #    for brand_domain in brand_domains:
+        #        if brand_domain in self.get_domain(url):
+        #            return 100000000
         domain_score=0
         url=self.clean_string(url)
         for domain, score in json_domains.items(): # Use .items() to get both keys (domains) and values (scores)
@@ -850,7 +952,7 @@ class FilterUrls:
 
 
     def filter_image_dict(self,image_urls_dict:list[dict]):
-        json_url_1="https://raw.githubusercontent.com/nikiconluxury/images-filter/main/step_1_filter_images.json"
+        #json_url_1="https://raw.githubusercontent.com/nikiconluxury/images-filter/main/step_1_filter_images.json"
         json_url_2="https://raw.githubusercontent.com/nikiconluxury/images-filter/main/step_2_filter_images.json"
         json_url_3="https://raw.githubusercontent.com/nikiconluxury/images-filter/main/domain_point_values.json"
         #json_dict_1=self.fetch_json_from_url(json_url_1)
@@ -874,41 +976,57 @@ class FilterUrls:
         second_pass=[]
         #for image_dict in first_pass:
         for image_dict in image_urls_dict:
+            if image_dict:
+                url=image_dict["url"]
+                description=image_dict["description"]
+                sku=image_dict["sku"]
+                brand=image_dict["brand"]
+                if len(self.get_score_2(url, description, sku, brand, json_dict_2))>0:
+                    second_pass.append(image_dict)
+            else:
+                print('encountered none object in image_urls_dict')
+                print(image_urls_dict)
+        if len(second_pass)==0 or None:
+            #return first_pass
+            return 'None found in this filter'
+        elif len(second_pass)>=1:
+            return second_pass[0]
+        
+        # #third_pass=[]
+        # for image_dict in second_pass:
+        #     if image_dict:
+        #         url=image_dict["url"]
+        #         brand_domains=image_dict["brand_domains"]
+        #         final_score=self.get_score_3(url, brand_domains, json_dict_3)
+        #         if not final_score:
+        #             return second_pass[0]
+        #         if final_score>0:
+        #             third_pass.append(image_dict)
+        #             image_dict["score"]=final_score
+        #     else:
+        #         print('encountered none object in second_pass')
+        #         print(image_urls_dict)
+        # # if len(third_pass)==0:
+        # #     return second_pass[0]
+        # # highest_score=0
+        # # for index,image_dict in enumerate(third_pass):
+        # #     if image_dict["score"]>highest_score:
+        # #         highest_score=image_dict["score"]
+        # #         final_index=index
+        # # return third_pass[final_index]
+
+    
+    
+
+    def filter_image_dict_2(self,image_urls_dict:list[dict]):
+        first_pass=[]
+        for image_dict in image_urls_dict:
             url=image_dict["url"]
             description=image_dict["description"]
             sku=image_dict["sku"]
             brand=image_dict["brand"]
-            if len(self.get_score_2(url, description, sku, brand, json_dict_2))>0:
-                second_pass.append(image_dict)
-        if len(second_pass)==0:
-            #return first_pass
-            return 'None found in this filter'
-        elif len(second_pass)==1:
-            return second_pass[0]
-        
-        #third_pass=[]
-        for image_dict in second_pass:
-            url=image_dict["url"]
-            brand_domains=image_dict["brand_domains"]
-            final_score=self.get_score_3(url, brand_domains, json_dict_3)
-            if not final_score:
-                return second_pass[0]
-            if final_score>0:
-                third_pass.append(image_dict)
-                image_dict["score"]=final_score
-        if len(third_pass)==0:
-            return second_pass[0]
-        highest_score=0
-        for index,image_dict in enumerate(third_pass):
-            if image_dict["score"]>highest_score:
-                highest_score=image_dict["score"]
-                final_index=index
-        return third_pass[final_index]
 
     
-    
-
-
 
 
 
@@ -999,547 +1117,145 @@ class FilterUrls:
                 seen.add(url_dict['url'])
                 new_list.append(url_dict)
         return new_list
-# class FilterUrls:
-#     def __init__(self, list_url, brand, sku):
-#         self.whitelisted_domains = [
-#             "fwrd.com",
-#             "modesens.com",
-#             "saksfifthavenue.com",
-#             "saksoff5th.com",
-#             "nordstrom.com",
-#             "nordstromrack.com",
-#             "giglio.com",
-#             "italist.com",
-#             "farfetch.com",
-#             "mytheresa.com",
-#             "neimanmarcus.com",
-#             "jomashop.com",
-#         ]
-#         # Ensure domains in the whitelist are prepared for direct comparison
-#         self.prepared_whitelisted_domains = [domain.replace('www.', '') for domain in self.whitelisted_domains]
-#         self.brand = brand.lower()  # Ensure brand is lowercase for comparison
-#         self.sku = sku.lower()  # Ensure SKU is lowercase for comparison
-#         self.url_list_nodups = self.remove_duplicates(list_url)
-#         self.filtered_urls = self.filter_urls(self.url_list_nodups)
+class SearchEngineV2:
 
-#     def filter_urls(self, urls):
-#         brand_urls = []
-#         whitelist_urls = []
-#         sku_urls = []
 
-#         for url in urls:
-#             url = url.strip()
-#             if not url.startswith(('http://', 'https://')):
-#                 url = 'http://' + url
+    def get_results(self, variation):
+        self.workflow_results = self.search_workflow(variation)
+        if self.workflow_results:
+            urls_list = self.workflow_results[0]
+            descriptions_list=self.workflow_results[1]
+            return urls_list,descriptions_list
 
-#             domain = urlparse(url).netloc.lower()
-#             if domain.startswith('www.'):
-#                 domain = domain[4:]
 
-#             # Check if URL contains the brand or SKU
-#             if self.sku in url.lower():
-#                 sku_urls.append((url, 'SKU'))
-#             elif self.brand in url.lower():
-#                 brand_urls.append((url, 'Brand'))
-#             elif domain in self.prepared_whitelisted_domains:
-#                 whitelist_urls.append((url, 'Whitelist'))
-
-#         # Combine the lists in the specified order: SKU, Whitelist, Brand
-#         combined_urls = sku_urls + whitelist_urls + brand_urls
-#         return combined_urls
-
-#     def remove_duplicates(self, input_list):
-#         seen = set()
-#         result = []
-#         for item in input_list:
-#             if item not in seen:
-#                 seen.add(item)
-#                 result.append(item)
-#         return result
- 
     
-# class FilterUrls:
-#     def __init__(self,list_url,brand,sku):
+    def search_workflow(self, variation):
+        html=self.get_html(variation)
+        if html["status"]!=200:
+            self.search_workflow(variation)
+        else:
+            html_body=html["body"]
+
+            if 'FINANCE",[22,1]]]]]' in html_body:
+                if '"2003":' not in html_body:
+                    print('no images found')
+                    my_list = [['no images found'],['no description found']]
+                    return my_list
+                else:
+                    print("parsing........")
+                    search_results = GP(html_body)
+                    print(f"{search_results}")
+                    urls_list=search_results[0]
+                    descriptions_list=search_results[1]    
+                    #print(f"{urls_list}\n------{descriptions_list}\nXXXXXXXX")      
+                    if not urls_list:
+                        print('no urls list')
+                        self.search_workflow(variation)
+                    elif not descriptions_list:
+                        print('no desc list')
+                        self.search_workflow(variation)
+                    else:
+                        clean_urls = self.clean_strings(urls_list)
+                        clean_descriptions = self.clean_strings(descriptions_list)
+                        if clean_urls and clean_descriptions:
+                            print(clean_urls)
+                            print(clean_descriptions)
+                            my_list=[clean_urls,clean_descriptions]
+                            return my_list
+                        else:
+                            return [urls_list,descriptions_list]
+
+            else:
+                print('GRID_STATE0'," NOT FOUND")
+                self.search_workflow(variation)
+
+
+    def clean_strings(self,strings):
+        cleaned_strings = []
+        for s in strings:
+            try:
+                # Normalize string to Unicode NFKC (Normalization Form KC)
+                # NFKC combines characters and applies compatibility decompositions,
+                # which can help in standardizing characters and removing certain types of problematic characters.
+                cleaned = unicodedata.normalize('NFKC', s)
+
+                # Optionally, here you can also remove or replace specific characters 
+                # that are known to be problematic for your application.
+                # For example, replacing non-breaking spaces with normal spaces:
+                cleaned = cleaned.replace('\u00A0', ' ')
+
+                cleaned_strings.append(cleaned)
+            except Exception as e:
+                # Log or handle any exceptions raised during the process
+                print(f"Error cleaning string {s}: {e}")
+                # Add the original string if there was an error
+                cleaned_strings.append(s)
+        return cleaned_strings
+
+    def fetch_serverless_no_js_url(self,settings_url, max_retries=3):
+        retries = 0
+        while retries < max_retries:
+            try:
+                response = requests.get(settings_url, headers={'User-Agent': 'Mozilla/5.0'})
+                if response.status_code == 200:
+                    data = response.json()
+                    #nimble
+                    #serverless_urls = data.get("serverless-urls", {}).get("no_js", [])
+                    serverless_urls = data.get("serverless-urls", {}).get("noip_nojs", [])
+                    if serverless_urls:
+                        return serverless_urls
+                retries += 1
+                print(f"Retry {retries}/{max_retries} for fetching serverless URLs...")
+            except requests.RequestException as e:
+                print(f"Failed to fetch serverless URLs: {e}")
+                retries += 1
         
-#         self.whitelisted_domains = [
-#         "fwrd.com",
-#         "modesens.com",
-#         "saksfifthavenue.com",
-#         "saksoff5th.com",
-#         "nordstrom.com",
-#         "nordstromrack.com"
-#     ]   
-       
-#         self.url_list_nodups = self.remove_duplicates(list_url)
-#         self.filtered_urls = self.filter_urls_by_brand_and_whitelist(self.url_list_nodups, brand, sku, self.whitelisted_domains)
+        print("Failed to fetch serverless URLs after maximum retries.")
+        return []
+    def get_html(self, query):
+        serverless_urls = self.fetch_serverless_no_js_url(str(SERVERLESS_URL_SETTINGS))
+        if not serverless_urls:
+            return {'status': 404, 'body': "Failed to obtain serverless URLs."}
         
-#     def filter_urls_helper(self):   
-        
-#         if self.filtered_urls:
-#             print("1_filter",self.filtered_urls,"+X+")
-#             self.filtered_urls = self.filter_urls_by_currency(['/us/','/us/en/','/en-us/','/us-en/','/us.','modesens.com/product','fwrd.com/mobile/product','marcjacobs.com/default/'], self.filtered_urls)
-#             print("2_filter",self.filtered_urls)
+        last_used_url = None
+        attempt_delay = 1  # Start with a 1 second delay
+
+        for _ in range(len(serverless_urls) * 3):  # Total attempts: thrice the number of serverless URLs
+            # Select a random URL avoiding the last used one
+            current_urls = [url for url in serverless_urls if url != last_used_url]
+            func_url = random.choice(current_urls)
+
+            print(f"Using URL: {func_url}")
             
-            
+            headers = {'Content-Type': 'application/json'}
 
-  
-            
-#     def remove_duplicates(self,input_list):
-#         """
-#         Remove duplicates from a list while preserving the order of the original list.
+            try:
+                response = requests.get(f'{func_url}?query={query}', headers=headers, timeout=185)
+                if response.status_code == 200:
+                    print(response.status_code)
+                    response_json = response.json()
+                    result = response_json.get('body', None)
+                    if result:  # If result is not None, unpack and return
+                        return {'status': response.status_code, 'body': self.unpack_content(result)}
+                    # If result is None, proceed to retry with a different URL
+                else:
+                    print(f"Request failed with status code: {response.status_code}")
+            except requests.RequestException as e:
+                print(f"Error making request: {e}")
 
-#         Args:
-#             input_list (list): The input list with potential duplicates.
+            last_used_url = func_url  # Update last used URL
+            time.sleep(attempt_delay)  # Apply the delay
+            attempt_delay = min(attempt_delay * 2, 60)  # Exponentially increase the delay, up to a max of 60 seconds
 
-#         Returns:
-#             list: A new list with duplicates removed.
-#         """
-#         seen = set()  # Initialize an empty set to store seen elements
-#         result = []   # Initialize an empty list to store unique elements in order
-
-#         for item in input_list:
-#             if item not in seen:
-#                 seen.add(item)  # Add the item to the set if it's not seen before
-#                 result.append(item)  # Add the item to the result list
-
-#         return result
-
-#     def filter_urls_by_brand_and_whitelist(self, urls, brand, sku, whitelisted_domains):
-#         brand_domains = [domain.replace('www.', '') for domain in brand_settings.get("domain_hierarchy", [])]
-#         whitelisted_domains = [domain.replace('www.', '') for domain in whitelisted_domains]
-#         approved_brand_urls = []
-#         approved_whitelist_urls = []
-
-#         if isinstance(urls, str):
-#             urls = urls.split(',')
-
-#         for url in urls:
-#             url = str(url).strip()
-#             if not url.startswith(('http://', 'https://')):
-#                 url = 'http://' + url
-
-#             try:
-#                 parsed_url = urlparse(url)
-#                 domain = parsed_url.netloc
-#                 if domain.startswith('www.'):
-#                     domain = domain[4:]
-
-#                 if domain in brand_domains:
-#                     approved_brand_urls.append([url, "brand"])
-#                 elif domain in whitelisted_domains:
-#                     approved_whitelist_urls.append([url, "whitelist"])
-
-#             except Exception as e:
-#                 print(f"Error parsing URL '{url}': {e}")
-        
-#         # Combine brand URLs and whitelisted URLs
-#         approved_urls = approved_brand_urls + approved_whitelist_urls
-#         return approved_urls if approved_urls else None
+        # After trying all URLs without success
+        return {'status': 404, 'body': "Failed after all attempts."}
 
 
-#     def search_keyword(self, keyword, hiQResponse, Descrip):
-#         keyword = str(keyword.lower())
-#         for ixi, item in enumerate(hiQResponse):
-#             item_lower = str(item).lower()
-#             print(f"Checking URL {ixi + 1} of {len(hiQResponse)}: {item}")
-#             if keyword in item_lower:
-#                 print(f"Keyword '{keyword}' found in URL {ixi + 1}: {item}")
-#                 return item, item, ixi, "url"
-#             elif ixi < len(Descrip):
-#                 description = str(Descrip[ixi]).lower()
-#                 print(description)
-#                 print(keyword)
-#                 print(f"Checking Description {ixi + 1} of {len(Descrip)}: {Descrip[ixi]}")
-#                 if keyword in description:
-#                     print(f"Keyword '{keyword}' found in Description {ixi + 1}: {Descrip[ixi]}")
-#                     return item, Descrip[ixi], ixi, "title"
-#             else:
-#                 print(f"No description available for URL {ixi + 1}. Skipping.")
-#         print(f"Keyword '{keyword}' not found in any URLs or Descriptions.")
-#         return None
-    
-# class DataFetcher:
-#     def __init__(self,url,brand):
-#         self.brand_settings = BrandSettings(json.loads(open(BRANDSETTINGSPATH,encoding='utf-8').read())).get_rules_for_brand(brand)
-#         self.url = url['url']
-#         self.modesens = None
-#         self.url_type = url['type']
-#         self.raw_html = self.send_regular_request(self.url)
-#         print(self.raw_html['status'],"+X")
-#         if self.raw_html['status'] == 200:
-       
-#             self.product_schemas = self.extract_product_schema(self.raw_html['body'])
-#             print(self.product_schemas,"+-+")
-#             ####! GUCCI PRODUCT RETURNING RESULTS 760246 10O0Y 5701
-          
-#             if self.product_schemas:
-                
-                
-#                 self.parsed_products = self.parse_product_schemas(self.product_schemas)
-#                 ##!!! GUCCI RETURNING SELLER AS NONE
-#                 print(self.parsed_products,"+--+")
-#                 if self.parsed_products:
-#                     self.parsed_products=self.seller_verification(self.parsed_products,self.url_type)
-#                     print(self.parsed_products,"++XX+")
-#                 else:
-#                     self.parsed_products = None
-                
-                
-#                 print(type(self.parsed_products),self.parsed_products,"+++")    
-#                 if "modesens" in self.url and self.parsed_products is not None:
-#                     self.modesens=ModesensParser(self.raw_html['body'],self.brand_settings)
-#                     if self.modesens.verify_seller:
-#                         self.parsed_products['prices'] = self.modesens.verify_seller["price"]
-#                         self.parsed_products['currency'] = self.modesens.verify_seller["currency"]
-#                         self.parsed_products['seller'] = self.modesens.verify_seller["seller"]
-#                     else:
-#                         self.parsed_products = None             
-#             else:
-#                 self.parsed_products = None
-
-#         else:
-#             self.parsed_products = None        
-            
-#     def seller_verification(self,product_details,url_type):
-#         approved_seller_list = [
-#          'saks fifth avenue',
-#          'nordstrom',
-#          'fwrd',
-#          'forward',
-#          'modesens',
-#          'ssense',
-#          'net-a-porter',
-#          'luisaviaroma',
-#          'burberry united states'
-#         ]
-#         for index,product in enumerate(product_details):
-#             if url_type == "brand" and product['prices'] is not None:
-#                 return product_details[index]
-#             if product['seller'] is not None:
-#                 if (product['seller'].lower() in approved_seller_list) or (product['seller'].lower() in list(map(lambda x:x.lower(),self.brand_settings['names']))):     
-#                     return product_details[index]
-#                 else:
-#                     continue
-#             else:
-#                 continue
-#         return None       
-        
-#     def send_regular_request(self, url):
-#         payload = { 'api_key': 'ab75344fcf729c63c9665e8e8a21d985', 'url': url, 'country_code': 'us'}
-# #        payload = { 'api_key': 'ab75344fcf729c63c9665e8e8a21d985', 'url': url}
-#         r = requests.get('https://api.scraperapi.com/', params=payload ,timeout=120)
-#         return {'status': r.status_code, 'body': r.text}
-
-#     def extract_product_schema(self, html_content):
-#         product_schemas = []  # List to store all found product schemas
-
-#         try:
-#             soup = BeautifulSoup(html_content, 'html.parser')
-#             schema_tags = soup.find_all('script', {'type': 'application/ld+json'})
-
-#             for tag in schema_tags:
-#                 try:
-#                     data = json.loads(tag.text)
-#                     if data.get('@type') == 'Product':
-#                         # Log the raw product schema for debugging
-#                         logging.debug("Raw Product Schema: %s", json.dumps(data, indent=4))
-#                         product_schemas.append(data)
-#                 except json.JSONDecodeError:
-#                     continue
-
-#             if not product_schemas:
-#                 logging.warning("No Product schema found in the HTML content.")
-#                 return None
-
-#             return product_schemas
-#         except Exception as e:
-#             logging.error(f"Error extracting product schemas from HTML: {e}")
-#             return None
-
-                
-#     def get_parsed_products(self):
-#         return self.parsed_products
-
-#     def parse_product_schemas(self,product_schemas):
-#         parsed_products = []
-
-#         for schema in product_schemas:
-#             if schema.get('@type') == 'Product':
-#                 offers_info = self.extract_offers(schema)
-#                 for offer in offers_info:
-                    
-#                     if(offer.get('@type') == 'Offer'):
-#                         prices=self.get_prices(offer)
-#                         currency=self.get_currency(offer)
-#                         seller=self.get_seller(offer)
-#                         description=self.get_description(offer)
-#                         title=self.get_title(offer)
-#                         images=self.get_images(offer)
-#                         url=self.get_url(offer)
-#                         product_details = self.create_product_details(title,images,prices,currency,url,description,seller,schema)
-#                         parsed_products.append(product_details)
-                        
-#                     elif(offer.get('@type') == 'AggregateOffer'):
-#                         for suboffer in self.extract_offers(offer):
-#                             prices=self.get_prices(suboffer)
-#                             currency=self.get_currency(suboffer)
-#                             seller=self.get_seller(suboffer)
-#                             description=self.get_description(suboffer)
-#                             title=self.get_title(suboffer)
-#                             images=self.get_images(suboffer)
-#                             url=self.get_url(suboffer)
-#                             product_details = self.create_product_details(title,images,prices,currency,url,description,seller,schema)
-#                             parsed_products.append(product_details)
-#         return parsed_products
-
-
-
-#     def get_title(self, data):
-#         if isinstance(data, dict):
-#             for key, value in data.items():
-#                 if key.lower() not in ['seller','brand']:
-#                     if key == 'name':
-#                         return value
-#                     else:
-#                         result = self.get_title(value)
-#                         if result:
-#                             return result
-#         else: return None        
-            
-#     def get_images(self,data):
-#         images = []
-#         if isinstance(data, dict):
-#             for key, value in data.items():
-#                 if key == 'image' and isinstance(value, (list, str)):
-#                     if isinstance(value, list):
-#                         images.extend(value)
-#                     else:
-#                         images.append(value)
-#                 else:
-#                     images.extend(self.get_images(value))
-#         elif isinstance(data, list):
-#             for item in data:
-#                 images.extend(self.get_images(item))
-#         return images
-
-#     def get_prices(self,data):
-#         prices = []
-#         if isinstance(data, dict):
-#             for key, value in data.items():
-#                 if key.lower() in ['price', 'lowprice', 'highprice'] and isinstance(value, str):
-#                     prices.append(value.replace("$", "").replace(",", "").replace(" ", ""))
-#                 elif key.lower() in ['price', 'lowprice', 'highprice'] and isinstance(value, (int, float)):
-#                     prices.append(value)
-#                 else:
-#                     prices.extend(self.get_prices(value))
-#         elif isinstance(data, list):
-#             for item in data:
-#                 prices.extend(self.get_prices(item))
-#         return prices 
-
-#     def get_currency(self,data):
-#         if isinstance(data, dict):
-#             currency = data.get('priceCurrency', None)
-#             if currency:
-#                 return currency
-#             for value in data.values():
-#                 result = self.get_currency(value)
-#                 if result:
-#                     return result
-#         elif isinstance(data, list):
-#             for item in data:
-#                 result = self.get_currency(item)
-#                 if result:
-#                     return result
-#     def get_url(self,data):
-#         if "modesens" in self.url:
-#             if isinstance(data, dict):
-#                 url = data.get('url', None)
-#                 if url:
-#                     return f"https://modesens.com{url}"
-#                 for value in data.values():
-#                     result = self.get_url(value)
-#                     if result:
-#                         return f"https://modesens.com{url}"
-#             elif isinstance(data, list):
-#                 for item in data:
-#                     result = self.get_url(item)
-#                     if result:
-#                         return f"https://modesens.com{url}"
-#         else:
-#             if isinstance(data, dict):
-#                 url = data.get('url', None)
-#                 if url:
-#                     return f"{url}"
-#                 for value in data.values():
-#                     result = self.get_url(value)
-#                     if result:
-#                         return f"{url}"
-#             elif isinstance(data, list):
-#                 for item in data:
-#                     result = self.get_url(item)
-#                     if result:
-#                         return f"{url}"
-        
-                
-                
-#     def get_description(self,data):
-#         if isinstance(data, dict):
-#             for key, value in data.items():
-#                 if key == 'description':
-#                     return value
-#                 else:
-#                     result = self.get_description(value)
-#                     if result:
-#                         return result
-                    
-#     def get_seller(self,data):
-#         if isinstance(data, dict):
-#             seller = data.get('seller', None)
-#             if isinstance(seller, dict) and 'name' in seller:
-#                 return seller['name']
-#             for value in data.values():
-#                 result = self.get_seller(value)
-#                 if result:
-#                     return result
-#         elif isinstance(data, list):
-#             for item in data:
-#                 result = self.get_seller(item)
-#                 if result:
-#                     return result
-
-
-#     def extract_offers(self,data):
-#         offers = []
-
-#         if isinstance(data, dict):
-#             if 'offers' in data:
-#                 # Directly append the offer or aggregate offer object
-#                 offer_data = data['offers']
-#                 if isinstance(offer_data, list):
-#                     offers.extend(offer_data)  # List of individual offers
-#                 else:
-#                     offers.append(offer_data)  # Single or aggregate offer
-#             else:
-#                 # Recursively search for offers in other dictionary values
-#                 for value in data.values():
-#                     offers.extend(self.extract_offers(value))
-
-#         elif isinstance(data, list):
-#             # If the data is a list, apply the function to each element
-#             for item in data:
-#                 offers.extend(self.extract_offers(item))
-
-#         return offers
-
-#     def create_product_details(self, title,images,prices,currency,url,description,seller,schema):
-#         product_details = {
-#                         'title': title,  
-#                         'images': images,  
-#                         'prices': prices,
-#                         'currency': currency,
-#                         'url': url,  
-#                         'description': description,  
-#                         'seller': seller.lower() if seller else None
-#                     }
-#         for key, value in product_details.items():
-#             if value in [None,[],"",{}]:
-#                 if key == 'title':
-#                     product_details[key] = self.get_title(schema)
-#                 elif key == 'images':
-#                     product_details[key] = self.get_images(schema)
-#                 elif key == 'prices':
-#                     product_details[key] = self.get_prices(schema)
-#                 elif key == 'currency':
-#                     product_details[key] = self.get_currency(schema)
-#                 elif key == 'url':
-#                     product_details[key] = self.get_url(schema)
-#                 elif key == 'description':
-#                     product_details[key] = self.get_description(schema)
-#                 elif key == 'seller':
-#                     seller = self.get_seller(schema)
-#                     product_details[key] = seller.lower() if seller else seller
-#         return product_details
-    
-#     def is_seller_verified(self, brand, seller):
-#         brand = brand.lower()
-#         seller = seller.lower()
-#         print('brand: {brand} seller: {seller}')
-#         return brand in seller or seller in brand
-    
-#     def select_details(self, parsed_products, brand_settings):
-#         selected_product = None
-#         for product in parsed_products:
-#             if self.is_seller_verified(brand_settings['names'][0], product['seller']):
-#                 selected_product = product
-#                 break
-#         return selected_product
-    
-# class ModesensParser():
-#     def __init__(self, html,brand_settings):
-#         self.brand_settings = brand_settings
-#         self.soup=BeautifulSoup(html, 'html.parser')
-#         self.blocks=self.extract_blocks()
-#         self.product_details=self.get_product_details()
-#         self.verify_seller = self.seller_verification(self.product_details)
-    
-#     def extract_blocks(self):
-#         blocks = self.soup.find_all('div', class_='d-inline-block each-list-con')
-#         return blocks
-#     def seller_verification(self,product_details):
-#         approved_seller_list = [
-#          'saks fifth avenue',
-#          'nordstrom',
-#          'fwrd',
-#          'forward',
-#          'modesens',
-#          'ssense',
-#          'net-a-porter'
-#         ]
-#         for index,product in enumerate(product_details):
-#             if product['seller'] is not None:
-#                 if (product['seller'].lower() in approved_seller_list) or (product['seller'].lower() in list(map(lambda x:x.lower(),self.brand_settings['names']))):     
-#                     return product_details[index]
-#                 else:
-#                     continue
-#             else:
-#                 continue
-#         return None
-        
-         
-#     def get_product_details(self):
-#         product_details = [] 
-
-#         for block in self.blocks:
-#             # Handle different types of price blocks
-#             product_detail={}
-#             price_box = block.find('div', class_='price-box') or block.find('span', class_='price-box')
-#             merchant_name = block.find('div', class_='merchant-name')
-            
-#             # Extracting seller
-#             seller = merchant_name.get_text(strip=True) if merchant_name else None
-#             prices = []
-#             if price_box:
-#                 # Find all span elements that potentially contain prices
-#                 price_spans = price_box.find_all('span', class_='position-relative') or [price_box]
-#                 for span in price_spans:
-#                     # Extracting numeric part of the price
-#                     price_text = span.get_text(strip=True)
-#                     match = re.search(r'\d+(?:\.\d+)?', price_text)
-                    
-#                     if match:
-#                         price = float(match.group())
-#                         prices.append(price)
-
-#                     # Extracting currency symbol
-#                     currency = price_text[0] if price_text else None
-
-#             # Store the highest price, seller, and currency
-#             if prices:
-#                 highest_price = max(prices)
-#                 product_detail['price']=highest_price
-#                 product_detail['seller']=seller
-#                 product_detail['currency']=currency
-#                 product_details.append(product_detail)
-
-#         return product_details
+    def unpack_content(self,encoded_content):
+        if encoded_content:
+            compressed_content = base64.b64decode(encoded_content)
+            original_content = zlib.decompress(compressed_content)
+            # with open('text.html', 'w') as file:
+            #     file.write(str(original_content))
+            return str(original_content)  # Return as binary data
+        return None

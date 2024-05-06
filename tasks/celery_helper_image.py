@@ -3,9 +3,12 @@ from typing import Dict
 from celery import chord,shared_task
 from celery.result import AsyncResult
 from celery_worker import celery_app
-from tasks.image_utility import SKUManager,SearchEngine,FilterUrls
+from tasks.image_utility import SKUManager,SearchEngine,FilterUrls,SearchEngineV2
 from tasks.classes_and_utility import BrandSettings
 from settings import BRANDSETTINGSPATH
+from tasks.SearchEngineV3 import SearchEngineV3
+
+
 
 def fetch_task_result_image(task_id: str) -> dict:
     """
@@ -85,94 +88,148 @@ def process_group_results(results):
 def get_brand_domains(brand):
     brand_settings = BrandSettings(json.loads(open(BRANDSETTINGSPATH,encoding='utf-8').read())).get_brand_img_domains(brand)
     return brand_settings
- 
-    
+
 @shared_task
-def process_item(item,brand):#get html and return list of parsed google urls
+def process_itemV2(item, brand,connection_pool):  # get html and return list of parsed google urls
     processed_items = []
-    search_engine = SearchEngine(item)
-    urls = search_engine.parsed_results
-    descriptions = search_engine.descriptions
-    for url, description in zip(urls, descriptions):
-        processed_items.append({
+    search_engine = SearchEngineV3(connection_pool)
+    search_engine.get_results(item)
+
+    if search_engine.image_url_list and search_engine.image_desc_list and search_engine.image_source_list:
+        image_url_list = search_engine.image_url_list
+        image_desc_list = search_engine.image_desc_list
+        image_source_list = search_engine.image_source_list
+
+        # Check if either urls or descriptions list is empty
+        if not image_url_list or not image_desc_list or not image_source_list:
+            raise ValueError("Either 'urls' or 'descriptions' list is empty. or source is empty")
+
+        # Check if urls and descriptions lists are of unequal lengths
+        if len(image_url_list) != len(image_desc_list):
+            # Determine the minimum length
+            min_length = min(len(image_url_list), len(image_desc_list))
+
+            # Truncate the lists to the minimum length
+            image_url_list = image_url_list[:min_length]
+            image_desc_list = image_desc_list[:min_length]
+
+        for url, description in zip(image_url_list, image_desc_list):
+            processed_items.append({
                 'url': url,
                 'description': description,
                 'sku': item,
                 'brand': brand,
-                'brand_domains':get_brand_domains(brand)
+                'brand_domains': get_brand_domains(brand)
             })
-    return processed_items
-
-# def filter_results(url_list_with_items, brand,sku):
-#     if url_list_with_items is None:
-#         url_list_with_items = []
-#     filtered_url_list_with_info = []
-
-#     # Create a mapping from URL to its corresponding dictionary
-#     url_to_original_dict = {url_dict['url']: url_dict for url_dict in url_list_with_items}
-    
-#     # Extract URLs and apply filtering
-#     urls = [url_dict['url'] for url_dict in url_list_with_items]
-    
-#     filtered_urls = FilterUrls(urls, brand,sku).filtered_urls
-
-#     print(filtered_urls,"------------------------------------------")
-#     # Ensure filtered_urls is iterable
-#     if not filtered_urls:
-#         filtered_urls = []
-#         return None
-#     if filtered_urls:    
-#         # Include only the filtered URLs, their corresponding original dictionary, and type
-#         for filtered_url_info in filtered_urls:
-#             print(filtered_url_info, "------------------------------------------")
-#             filtered_url = filtered_url_info[0] # Assuming the URL is the first element in the list
-#             url_type = filtered_url_info[1] # Extract type from the second element in the list
-            
-#             if filtered_url in url_to_original_dict:
-#                 original_dict = url_to_original_dict[filtered_url]
-#                 # Update the original dictionary with the type
-#                 original_dict.update({'type': url_type})
-#                 filtered_url_list_with_info.append(original_dict)
-
-#                 return filtered_url_list_with_info
-# @shared_task
-# def filter_results(url_list_with_items, brand, sku):
-#     if not url_list_with_items:
-#         return []
-
-#     # Create a mapping from URL to its corresponding dictionary
-#     url_to_original_dict = {url_dict['url']: url_dict for url_dict in url_list_with_items}
-
-#     # Extract URLs and apply filtering
-#     urls = [url_dict['url'] for url_dict in url_list_with_items]
-
-#     filtered_urls = FilterUrls(urls, brand, sku).filtered_urls
-
-#     filtered_url_list_with_info = []
-
-#     # Ensure filtered_urls is iterable and not empty
-#     if not filtered_urls:
-#         return []
-
-#     # Include only the filtered URLs, their corresponding original dictionary
-#     for filtered_url in filtered_urls:
-#         if filtered_url in url_to_original_dict:
-#             original_dict = url_to_original_dict[filtered_url]
-#             filtered_url_list_with_info.append(original_dict)
-
-#     return filtered_url_list_with_info
-    
+        return processed_items
+    else:
+        print('endless lop')
+        return process_itemV2(item, brand,connection_pool)
 @shared_task
-def filter_results(url_list_with_items, brand, sku):
+### IF ZIP OR SEARCH IS LESS THAN MIGHT CAUSE ISSUES
+def process_item(item,brand):#get html and return list of parsed google urls
+    processed_items = []
+    search_engine = SearchEngineV2()
+    results = search_engine.get_results(item)
+    if results:
+    #urls = search_engine.urls_list
+    #descriptions = search_engine.descriptions_list
+        urls = results[0]
+        descriptions = results[1]
+        #        
+        # Check if either urls or descriptions list is empty
+        if not urls or not descriptions:
+            raise ValueError("Either 'urls' or 'descriptions' list is empty.")
+
+        # Check if urls and descriptions lists are of unequal lengths
+        if len(urls) != len(descriptions):
+            
+            raise ValueError(f"'urls'{len(urls)} and 'descriptions' {len(descriptions)}lists are of unequal lengths.\n{urls}-----\n{descriptions}")
+
+
+        for url, description in zip(urls, descriptions):
+            values = url,description,None
+            processed_items.append({
+                    'url': url,
+                    'description': description,
+                    'sku': item,
+                    'brand': brand,
+                    'brand_domains':get_brand_domains(brand)
+                })
+
+        return processed_items
+    else:
+        return process_item(item,brand)
+
+# def write_results_to_mysql(result, entry_id, file_id, connection_pool):
+#     print(result)
+#     print('Writing to db')
+#     image_url = result.get('url')
+#     image_desc = result.get('description')
+#     image_source = result.get('source')
+#
+#     query = "UPDATE utb_ImageScraperResult SET ImageURL = %s, ImageDesc = %s, ImageSource = %s, CompleteTime = CURRENT_TIMESTAMP WHERE EntryID = %s AND FileID = %s"
+#     query_params = (image_url, image_desc, image_source, entry_id, file_id)
+#
+#     connection = connection_pool.get_connection()
+#     cursor = connection.cursor()
+#     cursor.execute(query, query_params)
+#     connection.commit()
+#     cursor.close()
+#     connection.close()
+#     print(f"Data written to DB for EntryID: {entry_id} and FileID: {file_id}")
+def write_results_to_mysql(result, entry_id, file_id, connection_pool):
+    print(result)
+    print('Writing to db')
+
+    image_url = result.get('url')
+    image_desc = result.get('description')
+    image_source = result.get('source')
+
+    query = "UPDATE utb_ImageScraperResult SET ImageURL = %s, ImageDesc = %s, ImageSource = %s, CompleteTime = CURRENT_TIMESTAMP WHERE EntryID = %s AND FileID = %s"
+    query_params = (image_url, image_desc, image_source, entry_id, file_id)
+
+    connection = connection_pool.get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute(query, query_params)
+    connection.commit()
+
+    cursor.close()
+    connection.close()
+
+    print(f"Data written to DB for EntryID: {entry_id} and FileID: {file_id}")
+# @shared_task
+# def filter_results(url_list_with_items, brand, sku,entry_id,file_id,conn_params):
+#     print(entry_id,file_id)
+#     if not url_list_with_items:
+#         return []# Return immediately if no URLs are provided????????????????????????______________________________
+#
+#     filter_urls_instance = FilterUrls(url_list_with_items, brand, sku)
+#     filter_results = filter_urls_instance.filtered_result
+#     if (type(filter_results) == list) and (len(filter_results) > 1):
+#         print('im in!')
+#         write_results_to_mysql(filter_results[0], entry_id, file_id, conn_params)
+#         return filter_results[0]
+#     else:
+#         write_results_to_mysql(filter_results, entry_id, file_id, conn_params)
+#         return filter_results
+@shared_task
+def filter_results(url_list_with_items, brand, sku, entry_id, file_id, connection_pool):
+    print(entry_id,file_id)
     if not url_list_with_items:
         return []# Return immediately if no URLs are provided????????????????????????______________________________
 
     filter_urls_instance = FilterUrls(url_list_with_items, brand, sku)
     filter_results = filter_urls_instance.filtered_result
     if (type(filter_results) == list) and (len(filter_results) > 1):
+        print('im in!')
+        write_results_to_mysql(fifilter_results[0], entry_id, file_id, connection_pool)
         return filter_results[0]
     else:
+        write_results_to_mysql(filter_results, entry_id, file_id, connection_pool)
         return filter_results
+    ###WRITE TO DBBB
 # @shared_task
 # def combine_results(results_with_items):
 #     print(results_with_items)
@@ -198,7 +255,6 @@ def combine_results(results_with_items):
 #     l_product_detail = {'url': classified_url['url'],'type' : classified_url['type'],'brand':brand_name,'variation':classified_url['variation'], 'details': parsed_data}
 #     return l_product_detail
 
-from collections import Counter
 
 from collections import Counter
 
