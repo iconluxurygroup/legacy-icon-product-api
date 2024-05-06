@@ -42,6 +42,7 @@ def process_itemV2(item, brand):  # get html and return list of parsed google ur
         image_url_list = search_engine.image_url_list
         image_desc_list = search_engine.image_desc_list
         image_source_list = search_engine.image_source_list
+        image_thumbnail_list = search_engine.image_thumb_list
 
         # Check if either urls or descriptions list is empty
         if not image_url_list or not image_desc_list or not image_source_list:
@@ -117,6 +118,7 @@ class SearchEngineV3:
         self.image_url_list = None
         self.image_desc_list = None
         self.image_source_list = None
+        self.entry_id_list = None
         self.conn_params = {
             'host': HOST_V,
             'database': DB_V,
@@ -135,6 +137,7 @@ class SearchEngineV3:
             self.image_url_list = workflow_results[0]
             self.image_desc_list = workflow_results[1]
             self.image_source_list = workflow_results[2]
+            self.image_thumb_list = workflow_results[3]
         else:
             return None
 
@@ -172,15 +175,17 @@ class SearchEngineV3:
                             image_url = parsed_data[0]
                             image_desc = parsed_data[1]
                             image_source = parsed_data[2]
+                            image_thumb = parsed_data[3]
+
 
                             print(
-                                f'Image URL: {type(image_url)} {image_url}\nImage Desc:  {type(image_desc)} {image_desc}\nImage Source:{type(image_source)}  {image_source}')
+                                f'Image URL: {type(image_url)} {image_url}\nImage Desc:  {type(image_desc)} {image_desc}\nImage Source:{type(image_source)}  {image_source}\nThumbs:{type(image_thumb)}  {image_thumb}')
                             if image_url and image_desc and image_source:
-                                return image_url, image_desc, image_source
+                                return image_url, image_desc, image_source,image_thumb
                             else:
                                 #### only for todd snyder fix
-                                if image_url[0]:
-                                    return [image_url[0]], ['NO DESCRIPTION'], ['NO SOURCE']
+                                #if image_url[0]:
+                                    #return [image_url[0]], ['NO DESCRIPTION'], ['NO SOURCE']
                                 print('trying again 4')
                                 self.remove_endpoint_mysql(endpoint)
                                 n_endpoint = self.get_endpoint_mysql()
