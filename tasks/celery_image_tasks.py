@@ -98,13 +98,15 @@ def write_results_to_mysql(result, entry_id, file_id):
     image_url = 'None found in this filter'
     image_desc = 'None found in this filter'
     image_source = 'None'
+    image_thumbnail = 'None'
     if result != 'None found in this filter' and result is not None:
         image_url = result.get('url')
         image_desc = result.get('description')
         image_source = result.get('source')
+        image_thumbnail = result.get('thumbnail')
 
-    query = "UPDATE utb_ImageScraperResult SET ImageURL = %s, ImageDesc = %s, ImageSource = %s, CompleteTime = CURRENT_TIMESTAMP WHERE EntryID = %s AND FileID = %s"
-    query_params = (image_url, image_desc, image_source, entry_id, file_id)
+    query = "UPDATE utb_ImageScraperResult SET ImageURL = %s, ImageDesc = %s, ImageSource = %s,ImageUrlThumbnail = %s ,CompleteTime = CURRENT_TIMESTAMP WHERE EntryID = %s AND FileID = %s"
+    query_params = (image_url, image_desc, image_source,image_thumbnail, entry_id, file_id)
 
     connection = global_connection_pool.get_connection()
     cursor = connection.cursor()
