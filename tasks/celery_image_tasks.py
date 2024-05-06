@@ -56,11 +56,15 @@ def process_itemV2(item, brand):  # get html and return list of parsed google ur
             # Truncate the lists to the minimum length
             image_url_list = image_url_list[:min_length]
             image_desc_list = image_desc_list[:min_length]
+            image_source_list = image_source_list[:min_length]
+            image_thumbnail_list = image_thumbnail_list[:min_length]
 
-        for url, description in zip(image_url_list, image_desc_list):
+        for url, description,source ,thumbnail in zip(image_url_list, image_desc_list,image_source_list,image_thumbnail_list):
             processed_items.append({
                 'url': url,
                 'description': description,
+                'thumbnail' : thumbnail,
+                'source' : source,
                 'sku': item,
                 'brand': brand,
                 'brand_domains': [] #get_brand_domains(brand)
