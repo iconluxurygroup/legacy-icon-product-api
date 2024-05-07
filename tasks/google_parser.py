@@ -112,7 +112,7 @@ def get_original_images(html_bytes):
         return None
     if not matched_google_image_data:
         print('No matched_google_image_data')
-        return (['No start_tag or end_tag'],['No start_tag or end_tag'],['No start_tag or end_tag'])
+        return (['No start_tag or end_tag'],['No start_tag or end_tag'],['No start_tag or end_tag'],['No start_tag or end_tag'])
     matched_google_image_data = str(matched_google_image_data).replace('\u003d','=')
     matched_google_image_data = str(matched_google_image_data).replace('\u0026', '&')
 
@@ -127,7 +127,7 @@ def get_original_images(html_bytes):
     thumbnails = matched_google_image_data
     if '"2003":' not in thumbnails:
         print('No 2003 tag found')
-        return (['No google image results found'],['No google image results found'],['No google image results found'])
+        return (['No google image results found'],['No google image results found'],['No google image results found'],['No google image results found'])
     matched_google_images_thumbnails = ", ".join(
          re.findall(r'\[\"(https\:\/\/encrypted-tbn0\.gstatic\.com\/images\?.*?)\",\d+,\d+\]',
                     str(thumbnails))).split(", ")

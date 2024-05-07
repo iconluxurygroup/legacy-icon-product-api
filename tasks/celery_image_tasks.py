@@ -187,7 +187,7 @@ class SearchEngineV3:
                             print(
                                 f'Image URL: {type(image_url)} {image_url}\nImage Desc:  {type(image_desc)} {image_desc}\nImage Source:{type(image_source)}  {image_source}\nThumbs:{type(image_thumb)}  {image_thumb}')
                             if image_url and image_desc and image_source:
-                                return image_url, image_desc, image_source,image_thumb
+                                return image_url, image_desc, image_source, image_thumb
                             else:
                                 #### only for todd snyder fix
                                 #if image_url[0]:
